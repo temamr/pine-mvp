@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 270 48% 98%;
+  --foreground: 267 33% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 267 33% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 267 33% 12%;
+  --primary: 267 78% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 292 77% 91%;
+  --secondary-foreground: 268 51% 24%;
+  --muted: 268 36% 93%;
+  --muted-foreground: 267 16% 42%;
+  --accent: 286 70% 48%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 356 72% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 268 28% 84%;
+  --input: 268 28% 84%;
+  --ring: 267 78% 52%;
+  --radius: 8px;
+}
+
+.dark {
+  --background: 264 32% 8%;
+  --foreground: 270 38% 96%;
+  --card: 264 28% 13%;
+  --card-foreground: 270 38% 96%;
+  --popover: 264 28% 13%;
+  --popover-foreground: 270 38% 96%;
+  --primary: 267 91% 72%;
+  --primary-foreground: 264 36% 9%;
+  --secondary: 279 42% 22%;
+  --secondary-foreground: 286 71% 90%;
+  --muted: 264 22% 18%;
+  --muted-foreground: 270 17% 72%;
+  --accent: 292 80% 68%;
+  --accent-foreground: 264 36% 9%;
+  --destructive: 356 72% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 264 20% 26%;
+  --input: 264 20% 26%;
+  --ring: 267 91% 72%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top left, rgb(233 213 255 / 0.75), transparent 34rem),
+    linear-gradient(180deg, hsl(var(--background)), #fbf7ff 42%, #ffffff 100%);
+  color: hsl(var(--foreground));
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  letter-spacing: 0;
+}
+
+a {
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: hsl(var(--secondary) / 0.7);
+  color: hsl(var(--foreground));
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.surface-grid {
+  background-image:
+    linear-gradient(rgb(126 34 206 / 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(126 34 206 / 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgb(126 34 206 / 0.28), transparent 34rem),
+    linear-gradient(180deg, hsl(var(--background)), #151024 52%, #0f0a19 100%);
+}
+
+.dark .surface-grid {
+  background-image:
+    linear-gradient(rgb(216 180 254 / 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(216 180 254 / 0.08) 1px, transparent 1px);
+}
+
+.dark .bg-white {
+  background-color: hsl(var(--card));
+}
+
+.dark .bg-white\/70 {
+  background-color: hsl(var(--card) / 0.7);
+}
+
+.dark .bg-white\/82 {
+  background-color: hsl(var(--card) / 0.82);
+}
+
+.dark .bg-white\/88 {
+  background-color: hsl(var(--card) / 0.88);
+}
+
+.dark .bg-white\/90 {
+  background-color: hsl(var(--card) / 0.9);
+}
+
+.dark .bg-white\/92 {
+  background-color: hsl(var(--card) / 0.92);
+}
+
+.dark .bg-white\/94 {
+  background-color: hsl(var(--card) / 0.94);
+}
+
+.dark .bg-white\/95 {
+  background-color: hsl(var(--card) / 0.95);
+}
+
+.dark .border-white,
+.dark .border-white\/80 {
+  border-color: hsl(var(--border));
+}
+
+.dark input,
+.dark textarea,
+.dark select {
+  color: hsl(var(--foreground));
+}
+
+.dark img {
+  filter: saturate(0.92) brightness(0.9);
+}
