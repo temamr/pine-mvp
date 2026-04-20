@@ -2,16 +2,18 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ImagePlus, Sparkles, UploadCloud } from "lucide-react";
-import type { ListingCondition } from "@/lib/domain";
+import { ArrowLeft, ArrowRight, ImagePlus, Loader2, Sparkles, UploadCloud } from "lucide-react";
+import type { Category, ListingCondition } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
+import { createSupabaseListingFromDraft, getSupabaseListingsClient } from "@/features/listings/lib/supabase-listings";
 import { mockCategories } from "@/lib/mock/fixtures";
 import { usePineStore } from "@/lib/mock/use-pine-store";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { listingDraftSchema } from "@/lib/validation/listing.schema";
 import { conditionLabel } from "@/lib/utils/labels";
 
@@ -38,9 +40,13 @@ type ErrorState = Partial<Record<keyof DraftState, string>>;
 export function SellWizardScreen() {
   const router = useRouter();
   const { toast } = useToast();
+  const supabaseEnabled = isSupabaseConfigured();
   const createListing = usePineStore((state) => state.createListing);
   const [step, setStep] = React.useState(0);
   const [errors, setErrors] = React.useState<ErrorState>({});
+  const [saving, setSaving] = React.useState(false);
+  const [categories, setCategories] = React.useState<Category[]>(mockCategories);
+  const [imageFiles, setImageFiles] = React.useState<Array<File | null>>([]);
   const [draft, setDraft] = React.useState<DraftState>({
     categoryId: mockCategories[0]?.id ?? "",
     title: "",
@@ -50,6 +56,41 @@ export function SellWizardScreen() {
     locationLabel: "Hayes Valley",
     imageUrls: []
   });
+
+  React.useEffect(() => {
+    if (!supabaseEnabled) {
+      setCategories(mockCategories);
+      return;
+    }
+
+    let active = true;
+    const { repositories } = getSupabaseListingsClient();
+
+    repositories.listings
+      .categories()
+      .then((items) => {
+        if (!active) {
+          return;
+        }
+
+        setCategories(items);
+        if (items[0]) {
+          update("categoryId", items[0].id);
+        }
+      })
+      .catch((error) => {
+        toast({
+          title: "Не удалось загрузить категории",
+          description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+    // update intentionally omitted because it mutates draft state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseEnabled, toast]);
 
   const qualityScore = React.useMemo(() => {
     let score = 20;
@@ -98,10 +139,10 @@ export function SellWizardScreen() {
 
   function handleFiles(files: FileList | null) {
     if (!files) return;
-    const urls = Array.from(files)
-      .slice(0, 10 - draft.imageUrls.length)
-      .map((file) => URL.createObjectURL(file));
+    const fileList = Array.from(files).slice(0, 10 - draft.imageUrls.length);
+    const urls = fileList.map((file) => URL.createObjectURL(file));
     update("imageUrls", [...draft.imageUrls, ...urls]);
+    setImageFiles((current) => [...current, ...fileList]);
   }
 
   function movePhoto(index: number, direction: -1 | 1) {
@@ -111,10 +152,16 @@ export function SellWizardScreen() {
     const [item] = next.splice(index, 1);
     next.splice(target, 0, item);
     update("imageUrls", next);
+    setImageFiles((current) => {
+      const nextFiles = [...current];
+      const [file] = nextFiles.splice(index, 1);
+      nextFiles.splice(target, 0, file ?? null);
+      return nextFiles;
+    });
   }
 
   function generateDescription() {
-    const category = mockCategories.find((item) => item.id === draft.categoryId)?.name.toLowerCase() ?? "товар";
+    const category = categories.find((item) => item.id === draft.categoryId)?.name.toLowerCase() ?? "товар";
     update(
       "description",
       `${draft.title || "Устройство"} в аккуратном состоянии. Подойдет тем, кто ищет надежный ${category} без лишних рисков. Готов показать серийный номер, дополнительные фото, состояние батареи или тесты производительности и договориться через Pine.`
@@ -122,8 +169,43 @@ export function SellWizardScreen() {
     toast({ title: "Описание предложено", description: "AI stub заполнил текст, его можно отредактировать." });
   }
 
-  function save(submitToModeration: boolean) {
+  async function save(submitToModeration: boolean) {
     if (!validate()) return;
+
+    if (supabaseEnabled) {
+      setSaving(true);
+
+      try {
+        const listing = await createSupabaseListingFromDraft({
+          categoryId: draft.categoryId,
+          title: draft.title,
+          description: draft.description,
+          price: Number(draft.price),
+          condition: draft.condition,
+          locationLabel: draft.locationLabel,
+          imageUrls: draft.imageUrls,
+          imageFiles,
+          submitToModeration
+        });
+
+        toast({
+          title: submitToModeration ? "Отправлено на модерацию" : "Черновик сохранен",
+          description: submitToModeration
+            ? "Запись создана в Supabase и ожидает проверки."
+            : "Черновик создан в Supabase."
+        });
+        router.push(submitToModeration ? "/profile/listings" : `/listings/${listing.id}`);
+      } catch (error) {
+        toast({
+          title: "Не удалось сохранить объявление",
+          description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        });
+      } finally {
+        setSaving(false);
+      }
+
+      return;
+    }
 
     const listing = createListing({
       categoryId: draft.categoryId,
@@ -181,7 +263,7 @@ export function SellWizardScreen() {
           <CardContent className="p-5">
             {step === 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                {mockCategories.map((category) => (
+                {categories.map((category) => (
                   <button
                     key={category.id}
                     className={draft.categoryId === category.id ? "rounded-lg border-2 border-primary bg-primary/10 p-4 text-left font-semibold" : "rounded-lg border bg-background p-4 text-left font-semibold"}
@@ -203,7 +285,14 @@ export function SellWizardScreen() {
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {mockPhotoUrls.map((url, index) => (
-                    <Button key={url} variant="outline" onClick={() => update("imageUrls", [...draft.imageUrls, url])}>
+                    <Button
+                      key={url}
+                      variant="outline"
+                      onClick={() => {
+                        update("imageUrls", [...draft.imageUrls, url]);
+                        setImageFiles((current) => [...current, null]);
+                      }}
+                    >
                       <ImagePlus className="h-4 w-4" />
                       Mock фото {index + 1}
                     </Button>
@@ -299,7 +388,7 @@ export function SellWizardScreen() {
             <p>Добавьте 2-4 фото с разными ракурсами.</p>
             <p>Укажите состояние честно: это снижает жалобы после встречи.</p>
             <p>Цена около рыночной чаще приводит к первому сообщению в течение дня.</p>
-            <p>Черновик сохраняется локально как mock listing.</p>
+            <p>{supabaseEnabled ? "Черновик сохраняется в Supabase со статусом draft." : "Черновик сохраняется локально как mock listing."}</p>
           </CardContent>
         </Card>
       </div>
@@ -310,9 +399,15 @@ export function SellWizardScreen() {
           Назад
         </Button>
         <div className="hidden md:block" />
-        <Button variant="outline" onClick={() => save(false)}>Save draft</Button>
+        <Button variant="outline" disabled={saving} onClick={() => void save(false)}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Save draft
+        </Button>
         {step === steps.length - 1 ? (
-          <Button onClick={() => save(true)}>Submit to moderation</Button>
+          <Button disabled={saving} onClick={() => void save(true)}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Submit to moderation
+          </Button>
         ) : (
           <Button onClick={nextStep}>
             Далее

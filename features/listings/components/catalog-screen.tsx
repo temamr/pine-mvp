@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Filter, Search, SlidersHorizontal, Sparkles } from "lucide-react";
-import type { Listing, ListingCondition } from "@/lib/domain";
+import type { Category, Listing, ListingCondition } from "@/lib/domain";
 import { FadeIn } from "@/components/motion/fade-in";
 import { Stagger, StaggerItem } from "@/components/motion/stagger";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +12,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
+import { trackSupabaseAnalyticsEvent } from "@/features/analytics/lib/supabase-analytics";
 import { ListingCard } from "@/features/listings/components/listing-card";
 import { ListingQuickPreview } from "@/features/listings/components/listing-quick-preview";
+import { fetchSupabaseCatalogData, toggleSupabaseFavorite } from "@/features/listings/lib/supabase-listings";
 import { mockCategories } from "@/lib/mock/fixtures";
 import { usePineStore } from "@/lib/mock/use-pine-store";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { conditionLabel } from "@/lib/utils/labels";
 
 type SortMode = "relevance" | "newest" | "price_low" | "price_high";
@@ -31,9 +35,14 @@ const conditions: ListingCondition[] = ["new", "like_new", "good", "fair", "for_
 
 export function CatalogScreen() {
   const router = useRouter();
-  const listings = usePineStore((state) => state.listings);
+  const { toast } = useToast();
+  const supabaseEnabled = isSupabaseConfigured();
+  const mockListings = usePineStore((state) => state.listings);
   const toggleFavorite = usePineStore((state) => state.toggleFavorite);
   const startConversation = usePineStore((state) => state.startConversation);
+  const [supabaseCategories, setSupabaseCategories] = React.useState<Category[]>([]);
+  const [supabaseListings, setSupabaseListings] = React.useState<Listing[]>([]);
+  const [supabaseLoading, setSupabaseLoading] = React.useState(supabaseEnabled);
   const [query, setQuery] = React.useState("");
   const [categoryId, setCategoryId] = React.useState<string>("all");
   const [sort, setSort] = React.useState<SortMode>("relevance");
@@ -41,6 +50,42 @@ export function CatalogScreen() {
   const [maxPrice, setMaxPrice] = React.useState("1500");
   const [preview, setPreview] = React.useState<Listing | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const categories = supabaseEnabled ? supabaseCategories : mockCategories;
+  const listings = supabaseEnabled ? supabaseListings : mockListings;
+
+  React.useEffect(() => {
+    if (!supabaseEnabled) {
+      return;
+    }
+
+    let active = true;
+    setSupabaseLoading(true);
+
+    fetchSupabaseCatalogData()
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+
+        setSupabaseCategories(data.categories);
+        setSupabaseListings(data.listings);
+      })
+      .catch((error) => {
+        toast({
+          title: "Не удалось загрузить Supabase каталог",
+          description: error instanceof Error ? error.message : "Проверьте env и RLS policies."
+        });
+      })
+      .finally(() => {
+        if (active) {
+          setSupabaseLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [supabaseEnabled, toast]);
 
   React.useEffect(() => {
     setLoading(true);
@@ -78,13 +123,93 @@ export function CatalogScreen() {
     return result;
   }, [categoryId, condition, listings, maxPrice, query, sort]);
 
+  React.useEffect(() => {
+    if (!supabaseEnabled || query.trim().length < 2) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void trackSupabaseAnalyticsEvent({
+        name: "search_used",
+        metadata: {
+          query: query.trim(),
+          results: filteredListings.length
+        }
+      });
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [filteredListings.length, query, supabaseEnabled]);
+
+  React.useEffect(() => {
+    if (!supabaseEnabled) {
+      return;
+    }
+
+    const hasFilters = categoryId !== "all" || condition !== "all" || sort !== "relevance" || maxPrice !== "1500";
+
+    if (!hasFilters) {
+      return;
+    }
+
+    void trackSupabaseAnalyticsEvent({
+      name: "filters_applied",
+      metadata: {
+        categoryId,
+        condition,
+        sort,
+        maxPrice: Number(maxPrice) || 0,
+        results: filteredListings.length
+      }
+    });
+  }, [categoryId, condition, filteredListings.length, maxPrice, sort, supabaseEnabled]);
+
   const recentlyViewed = listings.slice(0, 2);
   const recommendations = listings.filter((listing) => listing.status === "published").slice(0, 3);
 
   function handleStartChat(listingId: string) {
+    if (supabaseEnabled) {
+      toast({
+        title: "Чат подключим на Этапе 6",
+        description: "Объявление уже реальное, realtime conversation будет следующим шагом."
+      });
+      router.push(`/listings/${listingId}`);
+      return;
+    }
+
     const conversationId = startConversation(listingId);
     if (conversationId) {
       router.push(`/chat/${conversationId}`);
+    }
+  }
+
+  async function handleFavorite(listingId: string) {
+    if (!supabaseEnabled) {
+      toggleFavorite(listingId);
+      return;
+    }
+
+    try {
+      const result = await toggleSupabaseFavorite(listingId);
+
+      if (result.requiresAuth) {
+        router.push("/auth/sign-in?redirectTo=/");
+        return;
+      }
+
+      setSupabaseListings((current) =>
+        current.map((listing) =>
+          listing.id === listingId ? { ...listing, isFavorite: result.isFavorite } : listing
+        )
+      );
+      setPreview((current) =>
+        current?.id === listingId ? { ...current, isFavorite: result.isFavorite } : current
+      );
+    } catch (error) {
+      toast({
+        title: "Не удалось обновить избранное",
+        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+      });
     }
   }
 
@@ -96,7 +221,9 @@ export function CatalogScreen() {
             <Badge variant="secondary">Каталог Pine</Badge>
             <h1 className="mt-3 text-3xl font-bold tracking-normal">Найдите вещь и договоритесь в чате</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Поиск, фильтры, быстрый просмотр и переход к диалогу работают на mock data.
+              {supabaseEnabled
+                ? "Поиск, фильтры, быстрый просмотр и избранное читают реальные Supabase данные."
+                : "Поиск, фильтры, быстрый просмотр и переход к диалогу работают на mock data."}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:w-[34rem]">
@@ -177,7 +304,7 @@ export function CatalogScreen() {
           >
             Все
           </button>
-          {mockCategories.map((category) => (
+          {categories.map((category) => (
             <button
               key={category.id}
               className={categoryId === category.id ? "shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white" : "shrink-0 rounded-lg border bg-white px-3 py-2 text-sm font-semibold"}
@@ -195,7 +322,7 @@ export function CatalogScreen() {
           </Badge>
         </div>
 
-        {loading ? (
+        {loading || supabaseLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((item) => (
               <Skeleton key={item} className="h-80" />
@@ -207,7 +334,7 @@ export function CatalogScreen() {
               <StaggerItem key={listing.id}>
                 <ListingCard
                   listing={listing}
-                  onFavoriteClick={toggleFavorite}
+                  onFavoriteClick={handleFavorite}
                   onQuickPreview={setPreview}
                 />
               </StaggerItem>
@@ -268,7 +395,7 @@ export function CatalogScreen() {
             setPreview(null);
           }
         }}
-        onFavorite={toggleFavorite}
+        onFavorite={handleFavorite}
         onStartChat={handleStartChat}
       />
     </div>

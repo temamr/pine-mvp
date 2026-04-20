@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,10 +17,37 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/toast";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
 import { primaryNavItems, secondaryNavItems } from "@/components/app-shell/nav-items";
+import { useSupabaseSession } from "@/features/auth/components/use-supabase-session";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { PINE_BRAND } from "@/lib/theme";
 
 export function Header() {
+  const router = useRouter();
   const { toast } = useToast();
+  const { configured, loading, user, profile } = useSupabaseSession();
+  const displayName = configured ? profile?.display_name ?? user?.email ?? "Pine user" : "Eli Parker";
+  const avatarUrl = configured
+    ? profile?.avatar_url ?? undefined
+    : "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80";
+  const initials = displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  async function signOut() {
+    if (!configured) {
+      toast({ title: "Demo mode", description: "Auth подключается через Supabase env." });
+      return;
+    }
+
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    toast({ title: "Вы вышли", description: "Session очищена." });
+    router.push("/");
+    router.refresh();
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b bg-white/88 backdrop-blur">
@@ -75,28 +103,37 @@ export function Header() {
           </Link>
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Avatar className="h-9 w-9">
-                <AvatarImage src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80" />
-                <AvatarFallback>EP</AvatarFallback>
-              </Avatar>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href="/profile">Профиль</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/profile/listings">Мои объявления</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => toast({ title: "Mock sign out", description: "Auth подключим на backend-этапе." })}>
-              Выйти
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {configured && !loading && !user ? (
+          <Button asChild variant="outline">
+            <Link href="/auth/sign-in">Войти</Link>
+          </Button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={avatarUrl} />
+                  <AvatarFallback>{initials || "P"}</AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href="/profile">Профиль</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/onboarding">Onboarding</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/profile/listings">Мои объявления</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut}>
+                Выйти
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </header>
   );

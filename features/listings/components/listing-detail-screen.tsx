@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Flag, Heart, MapPin, MessageCircle, ShieldCheck, Star, Tag } from "lucide-react";
+import type { Listing, User } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +22,13 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
+import { trackSupabaseListingView } from "@/features/analytics/lib/supabase-analytics";
+import { createSupabaseOffer, loadSupabaseThread, startSupabaseConversation } from "@/features/chat/lib/supabase-chat";
 import { ListingCard } from "@/features/listings/components/listing-card";
+import { fetchSupabaseListingDetails, toggleSupabaseFavorite } from "@/features/listings/lib/supabase-listings";
+import { createSupabaseComplaint } from "@/features/moderation/lib/supabase-moderation";
 import { usePineStore, demoUsers } from "@/lib/mock/use-pine-store";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { STATUS_TONE } from "@/lib/theme";
 import { formatMoney, formatRelativeDate } from "@/lib/utils/format";
 import { conditionLabel, listingStatusLabel } from "@/lib/utils/labels";
@@ -30,6 +36,7 @@ import { conditionLabel, listingStatusLabel } from "@/lib/utils/labels";
 export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const router = useRouter();
   const { toast } = useToast();
+  const supabaseEnabled = isSupabaseConfigured();
   const listings = usePineStore((state) => state.listings);
   const toggleFavorite = usePineStore((state) => state.toggleFavorite);
   const startConversation = usePineStore((state) => state.startConversation);
@@ -39,7 +46,59 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const [offerAmount, setOfferAmount] = React.useState("");
   const [offerMessage, setOfferMessage] = React.useState("Готов забрать сегодня, если цена подойдет.");
   const [complaintDetails, setComplaintDetails] = React.useState("");
-  const listing = listings.find((item) => item.id === listingId);
+  const [remoteListing, setRemoteListing] = React.useState<Listing | null>(null);
+  const [remoteSeller, setRemoteSeller] = React.useState<User | null>(null);
+  const [remoteSimilar, setRemoteSimilar] = React.useState<Listing[]>([]);
+  const [remoteLoading, setRemoteLoading] = React.useState(supabaseEnabled);
+  const mockListing = listings.find((item) => item.id === listingId);
+  const listing = supabaseEnabled ? remoteListing : mockListing;
+
+  React.useEffect(() => {
+    if (!supabaseEnabled) {
+      return;
+    }
+
+    let active = true;
+    setRemoteLoading(true);
+
+    fetchSupabaseListingDetails(listingId)
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+
+        setRemoteListing(data?.listing ?? null);
+        setRemoteSeller(data?.seller ?? null);
+        setRemoteSimilar(data?.similar ?? []);
+
+        if (data?.listing) {
+          void trackSupabaseListingView(data.listing.id);
+        }
+      })
+      .catch((error) => {
+        toast({
+          title: "Не удалось загрузить объявление",
+          description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        });
+      })
+      .finally(() => {
+        if (active) {
+          setRemoteLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [listingId, supabaseEnabled, toast]);
+
+  if (remoteLoading) {
+    return (
+      <Card className="bg-white/92">
+        <CardContent className="p-6 text-sm text-muted-foreground">Загружаю объявление из Supabase...</CardContent>
+      </Card>
+    );
+  }
 
   if (!listing) {
     return (
@@ -57,24 +116,86 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   }
 
   const currentListing = listing;
-  const seller = demoUsers.find((user) => user.id === currentListing.sellerId);
+  const seller = supabaseEnabled
+    ? remoteSeller
+    : demoUsers.find((user) => user.id === currentListing.sellerId);
   const activeImage = currentListing.images[imageIndex] ?? currentListing.images[0];
   const lowball = Number(offerAmount) > 0 && Number(offerAmount) < currentListing.price.amount * 0.75;
-  const similarListings = listings.filter(
-    (item) =>
-      item.categoryId === currentListing.categoryId &&
-      item.id !== currentListing.id &&
-      (item.status === "published" || item.status === "reserved")
-  );
+  const similarListings = supabaseEnabled
+    ? remoteSimilar
+    : listings.filter(
+        (item) =>
+          item.categoryId === currentListing.categoryId &&
+          item.id !== currentListing.id &&
+          (item.status === "published" || item.status === "reserved")
+      );
 
-  function handleStartChat() {
+  async function handleStartChat() {
+    if (supabaseEnabled) {
+      try {
+        const conversationId = await startSupabaseConversation(currentListing.id);
+        router.push(`/chat/${conversationId}`);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+
+        toast({
+          title: "Чат не создан",
+          description
+        });
+
+        if (description.includes("Войдите")) {
+          router.push(`/auth/sign-in?redirectTo=/listings/${currentListing.id}`);
+        }
+      }
+
+      return;
+    }
+
     const conversationId = startConversation(currentListing.id);
     if (conversationId) {
       router.push(`/chat/${conversationId}`);
     }
   }
 
-  function handleOffer() {
+  async function handleOffer() {
+    if (supabaseEnabled) {
+      const amount = Number(offerAmount);
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        toast({ title: "Укажите цену", description: "Оффер должен быть положительным числом." });
+        return;
+      }
+
+      try {
+        const conversationId = await startSupabaseConversation(currentListing.id);
+        const thread = await loadSupabaseThread(conversationId);
+
+        if (!thread.conversation) {
+          throw new Error("Диалог не найден после создания.");
+        }
+
+        await createSupabaseOffer(thread.conversation, amount, offerMessage);
+        toast({
+          title: "Оффер отправлен",
+          description: "Продавец увидит предложение в диалоге."
+        });
+        router.push(`/chat/${conversationId}`);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+
+        toast({
+          title: "Оффер не отправлен",
+          description
+        });
+
+        if (description.includes("Войдите")) {
+          router.push(`/auth/sign-in?redirectTo=/listings/${currentListing.id}`);
+        }
+      }
+
+      return;
+    }
+
     const conversationId = startConversation(currentListing.id);
     const offer = createOffer(conversationId, Number(offerAmount), offerMessage);
     if (offer) {
@@ -86,7 +207,38 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
     }
   }
 
-  function handleComplaint() {
+  async function handleComplaint() {
+    if (supabaseEnabled) {
+      if (!complaintDetails.trim()) {
+        toast({ title: "Добавьте детали", description: "Модерации нужен короткий контекст." });
+        return;
+      }
+
+      try {
+        await createSupabaseComplaint({
+          targetType: "listing",
+          targetId: currentListing.id,
+          reason: "other",
+          details: complaintDetails
+        });
+        setComplaintDetails("");
+        toast({ title: "Жалоба отправлена", description: "Trust & Safety увидит обращение в Supabase." });
+      } catch (error) {
+        const description = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+
+        toast({
+          title: "Жалоба не отправлена",
+          description
+        });
+
+        if (description.includes("Войдите")) {
+          router.push(`/auth/sign-in?redirectTo=/listings/${currentListing.id}`);
+        }
+      }
+
+      return;
+    }
+
     if (!complaintDetails.trim()) {
       toast({ title: "Добавьте детали", description: "Модерации нужен короткий контекст." });
       return;
@@ -100,6 +252,36 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
     });
     setComplaintDetails("");
     toast({ title: "Жалоба отправлена", description: "Статус появится в разделе модерации." });
+  }
+
+  async function handleFavorite(listingIdToToggle: string) {
+    if (!supabaseEnabled) {
+      toggleFavorite(listingIdToToggle);
+      return;
+    }
+
+    try {
+      const result = await toggleSupabaseFavorite(listingIdToToggle);
+
+      if (result.requiresAuth) {
+        router.push(`/auth/sign-in?redirectTo=/listings/${listingIdToToggle}`);
+        return;
+      }
+
+      setRemoteListing((current) =>
+        current?.id === listingIdToToggle ? { ...current, isFavorite: result.isFavorite } : current
+      );
+      setRemoteSimilar((current) =>
+        current.map((item) =>
+          item.id === listingIdToToggle ? { ...item, isFavorite: result.isFavorite } : item
+        )
+      );
+    } catch (error) {
+      toast({
+        title: "Не удалось обновить избранное",
+        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+      });
+    }
   }
 
   return (
@@ -136,7 +318,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                   <CardTitle className="text-2xl leading-tight">{listing.title}</CardTitle>
                   <p className="mt-2 text-sm text-muted-foreground">{formatRelativeDate(listing.createdAt)}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => toggleFavorite(listing.id)} aria-label="В избранное">
+                <Button variant="ghost" size="icon" onClick={() => handleFavorite(listing.id)} aria-label="В избранное">
                   <Heart className={listing.isFavorite ? "h-5 w-5 fill-red-500 text-red-500" : "h-5 w-5"} />
                 </Button>
               </div>
@@ -272,13 +454,13 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
         <h2 className="text-2xl font-bold">Похожие товары</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {similarListings.map((item) => (
-            <ListingCard key={item.id} listing={item} onFavoriteClick={toggleFavorite} />
+            <ListingCard key={item.id} listing={item} onFavoriteClick={handleFavorite} />
           ))}
         </div>
       </section>
 
       <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 gap-2 border-t bg-white/95 p-3 backdrop-blur md:hidden">
-        <Button variant="outline" onClick={() => toggleFavorite(listing.id)}>
+        <Button variant="outline" onClick={() => handleFavorite(listing.id)}>
           <Heart className={listing.isFavorite ? "h-4 w-4 fill-red-500 text-red-500" : "h-4 w-4"} />
           Сохранить
         </Button>
