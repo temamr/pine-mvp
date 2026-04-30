@@ -64,7 +64,7 @@ export async function fetchSupabaseModerationData(): Promise<SupabaseModerationD
 
   const [{ data: caseRows, error: caseError }, { data: complaintRows, error: complaintError }] = await Promise.all([
     isStaff ? casesQuery.eq("status", "open") : casesQuery.limit(20),
-    isStaff ? complaintsQuery.limit(100) : complaintsQuery.eq("reporter_id", user.id).limit(100)
+    isStaff ? complaintsQuery.in("status", ["submitted", "reviewing"]).limit(100) : complaintsQuery.eq("reporter_id", user.id).limit(100)
   ]);
 
   if (caseError) {
