@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Eye, Heart, MapPin } from "lucide-react";
+import { Eye, Heart, ImageOff, MapPin } from "lucide-react";
 import type { Listing } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,14 @@ export function ListingCard({ listing, onFavoriteClick, onQuickPreview }: Listin
               className="object-cover transition-transform duration-300 group-hover:scale-105"
               sizes="(max-width: 768px) 100vw, 33vw"
             />
-          ) : null}
+          ) : (
+            <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/10 via-secondary/30 to-background text-center text-muted-foreground">
+              <div className="grid gap-2">
+                <ImageOff className="mx-auto h-8 w-8" />
+                <span className="text-sm font-medium">Фото появится после загрузки</span>
+              </div>
+            </div>
+          )}
           <div className="absolute left-3 top-3">
             <Badge variant={STATUS_TONE[listing.status]}>{listingStatusLabel[listing.status]}</Badge>
           </div>

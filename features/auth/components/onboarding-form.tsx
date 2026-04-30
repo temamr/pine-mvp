@@ -28,6 +28,8 @@ export function OnboardingForm() {
   const [country, setCountry] = React.useState("Россия");
   const [avatarUrl, setAvatarUrl] = React.useState("");
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = React.useState("");
+  const [acceptedPolicies, setAcceptedPolicies] = React.useState(false);
 
   React.useEffect(() => {
     if (!configured) {
@@ -93,6 +95,20 @@ export function OnboardingForm() {
     return data.publicUrl;
   }
 
+  React.useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(avatarFile);
+    setAvatarPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [avatarFile]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -104,6 +120,14 @@ export function OnboardingForm() {
     if (!userId) {
       toast({ title: "Нужен вход", description: "Сначала войдите или создайте аккаунт." });
       router.push("/auth/sign-in?redirectTo=/onboarding");
+      return;
+    }
+
+    if (!acceptedPolicies) {
+      toast({
+        title: "Нужно согласие",
+        description: "Подтвердите согласие на обработку персональных данных."
+      });
       return;
     }
 
@@ -145,7 +169,7 @@ export function OnboardingForm() {
     }
   }
 
-  const previewUrl = avatarFile ? URL.createObjectURL(avatarFile) : avatarUrl;
+  const previewUrl = avatarPreviewUrl || avatarUrl;
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
@@ -208,6 +232,17 @@ export function OnboardingForm() {
                   <Input value={country} onChange={(event) => setCountry(event.target.value)} />
                 </label>
               </div>
+              <label className="flex items-start gap-3 rounded-lg border bg-card/60 p-3 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={acceptedPolicies}
+                  onChange={(event) => setAcceptedPolicies(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border"
+                />
+                <span>
+                  Подтверждаю согласие на обработку персональных данных и публикацию контактной информации в рамках сделок Pine.
+                </span>
+              </label>
               <Button disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Сохранить профиль

@@ -3,6 +3,7 @@ import {
   Heart,
   Home,
   MessageCircle,
+  Package,
   PackageCheck,
   PlusCircle,
   ShieldCheck,
@@ -15,6 +16,7 @@ type ProfileRole = Tables<"profiles">["role"] | null | undefined;
 export const primaryNavItems = [
   { label: "Каталог", href: "/", icon: Home },
   { label: "Создать объявление", href: "/sell", icon: PlusCircle },
+  { label: "Мои объявления", href: "/profile/listings", icon: Package },
   { label: "Чат", href: "/chat", icon: MessageCircle },
   { label: "Избранное", href: "/favorites", icon: Heart },
   { label: "Профиль", href: "/profile", icon: UserRound }

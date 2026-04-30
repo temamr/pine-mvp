@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export function EmailAuthForm({ mode }: { mode: EmailAuthMode }) {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const [acceptedPolicies, setAcceptedPolicies] = React.useState(mode === "sign-in");
   const redirectTo = searchParams.get("redirectTo") ?? "/onboarding";
   const configured = isSupabaseConfigured();
 
@@ -26,6 +28,14 @@ export function EmailAuthForm({ mode }: { mode: EmailAuthMode }) {
 
     if (!configured) {
       toast({ title: "Вход пока недоступен", description: "Проверьте настройки проекта и перезапустите сайт." });
+      return;
+    }
+
+    if (mode === "sign-up" && !acceptedPolicies) {
+      toast({
+        title: "Нужно согласие",
+        description: "Подтвердите согласие на обработку персональных данных, чтобы продолжить."
+      });
       return;
     }
 
@@ -45,8 +55,33 @@ export function EmailAuthForm({ mode }: { mode: EmailAuthMode }) {
     setLoading(false);
 
     if (result.error) {
+      if (mode === "sign-up" && result.error.message.toLowerCase().includes("already registered")) {
+        toast({
+          title: "Аккаунт уже существует",
+          description: "Попробуйте войти с этим email."
+        });
+        router.push(`/auth/sign-in?redirectTo=${encodeURIComponent(redirectTo)}`);
+        return;
+      }
+
       toast({ title: "Не удалось выполнить вход", description: result.error.message });
       return;
+    }
+
+    if (mode === "sign-up") {
+      const hasSession = Boolean(result.data.session);
+      const hasIdentity = Boolean(result.data.user?.identities?.length);
+
+      if (!hasSession) {
+        toast({
+          title: hasIdentity ? "Аккаунт создан" : "Аккаунт уже существует",
+          description: hasIdentity
+            ? "Подтвердите email, если это требуется, затем войдите в аккаунт."
+            : "Для этого email уже есть аккаунт. Выполните вход."
+        });
+        router.push(`/auth/sign-in?redirectTo=${encodeURIComponent(redirectTo)}`);
+        return;
+      }
     }
 
     toast({
@@ -74,6 +109,28 @@ export function EmailAuthForm({ mode }: { mode: EmailAuthMode }) {
           required
         />
       </label>
+      {mode === "sign-up" ? (
+        <label className="flex items-start gap-3 rounded-lg border bg-card/60 p-3 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={acceptedPolicies}
+            onChange={(event) => setAcceptedPolicies(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border"
+            required
+          />
+          <span>
+            Я соглашаюсь с обработкой персональных данных и принимаю{" "}
+            <Link href="/privacy" className="font-medium text-primary hover:underline">
+              политику конфиденциальности
+            </Link>{" "}
+            и{" "}
+            <Link href="/terms" className="font-medium text-primary hover:underline">
+              условия использования
+            </Link>
+            .
+          </span>
+        </label>
+      ) : null}
       <Button disabled={loading}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {mode === "sign-in" ? "Войти" : "Создать аккаунт"}

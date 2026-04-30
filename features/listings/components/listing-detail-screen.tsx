@@ -4,7 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Flag, Heart, MapPin, MessageCircle, ShieldCheck, Star, Tag } from "lucide-react";
+import { Flag, Heart, ImageOff, MapPin, MessageCircle, ShieldCheck, Star, Tag } from "lucide-react";
 import type { Listing, User } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -292,7 +292,14 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
           <div className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-muted shadow-soft">
             {activeImage ? (
               <Image src={activeImage.url} alt={activeImage.alt} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 55vw" priority />
-            ) : null}
+            ) : (
+              <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/10 via-secondary/30 to-background text-center text-muted-foreground">
+                <div className="grid gap-2">
+                  <ImageOff className="mx-auto h-10 w-10" />
+                  <span className="text-sm font-medium">Изображение объявления пока недоступно</span>
+                </div>
+              </div>
+            )}
             <div className="absolute left-3 top-3 flex gap-2">
               <Badge variant={STATUS_TONE[listing.status]}>{listingStatusLabel[listing.status]}</Badge>
               <Badge variant="outline" className="bg-white/90">{conditionLabel[listing.condition]}</Badge>
@@ -406,7 +413,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                   <select
                     value={complaintTargetType}
                     onChange={(event) => setComplaintTargetType(event.target.value as "listing" | "user")}
-                    className="h-11 rounded-lg border bg-white px-3 text-sm"
+                    className="h-11 rounded-lg border bg-background px-3 text-sm"
                   >
                     <option value="listing">На объявление</option>
                     <option value="user">На продавца</option>

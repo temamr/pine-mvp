@@ -47,7 +47,7 @@ export function CatalogScreen() {
   const [categoryId, setCategoryId] = React.useState<string>("all");
   const [sort, setSort] = React.useState<SortMode>("relevance");
   const [condition, setCondition] = React.useState<ListingCondition | "all">("all");
-  const [maxPrice, setMaxPrice] = React.useState("1500");
+  const [maxPrice, setMaxPrice] = React.useState("");
   const [preview, setPreview] = React.useState<Listing | null>(null);
   const [loading, setLoading] = React.useState(false);
   const categories = supabaseEnabled ? supabaseCategories : mockCategories;
@@ -95,7 +95,7 @@ export function CatalogScreen() {
 
   const filteredListings = React.useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const max = Number(maxPrice) || Number.POSITIVE_INFINITY;
+    const max = maxPrice.trim() ? Number(maxPrice) || Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY;
     const result = listings.filter((listing) => {
       const visibleInCatalog = listing.status === "published" || listing.status === "reserved";
       const matchesQuery = normalized
@@ -146,7 +146,7 @@ export function CatalogScreen() {
       return;
     }
 
-    const hasFilters = categoryId !== "all" || condition !== "all" || sort !== "relevance" || maxPrice !== "1500";
+    const hasFilters = categoryId !== "all" || condition !== "all" || sort !== "relevance" || maxPrice.trim() !== "";
 
     if (!hasFilters) {
       return;
@@ -222,8 +222,8 @@ export function CatalogScreen() {
             <h1 className="mt-3 text-3xl font-bold tracking-normal">Найдите вещь и договоритесь в чате</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               {supabaseEnabled
-                ? "Поиск, фильтры, быстрый просмотр и избранное читают реальные Supabase данные."
-                : "Поиск, фильтры, быстрый просмотр и переход к диалогу работают на mock data."}
+                ? "Поиск, фильтры, быстрый просмотр и избранное работают на реальных данных."
+                : "Поиск, фильтры, быстрый просмотр и переход к диалогу уже готовы для сценариев каталога."}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:w-[34rem]">
@@ -252,7 +252,7 @@ export function CatalogScreen() {
                     <select
                       value={condition}
                       onChange={(event) => setCondition(event.target.value as ListingCondition | "all")}
-                      className="h-11 rounded-lg border bg-white px-3 text-sm"
+                      className="h-11 rounded-lg border bg-background px-3 text-sm"
                     >
                       <option value="all">Любое</option>
                       {conditions.map((item) => (
@@ -267,7 +267,7 @@ export function CatalogScreen() {
                     <select
                       value={sort}
                       onChange={(event) => setSort(event.target.value as SortMode)}
-                      className="h-11 rounded-lg border bg-white px-3 text-sm"
+                      className="h-11 rounded-lg border bg-background px-3 text-sm"
                     >
                       {(Object.keys(sortLabel) as SortMode[]).map((item) => (
                         <option key={item} value={item}>
@@ -283,7 +283,7 @@ export function CatalogScreen() {
                     onClick={() => {
                       setCategoryId("all");
                       setCondition("all");
-                      setMaxPrice("1500");
+                      setMaxPrice("");
                       setSort("relevance");
                     }}
                   >
