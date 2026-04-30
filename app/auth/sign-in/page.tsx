@@ -6,7 +6,7 @@ import { EmailAuthForm } from "@/features/auth/components/email-auth-form";
 export default function SignInPage() {
   return (
     <AuthCard
-      eyebrow="Supabase Auth"
+      eyebrow="Вход"
       title="Вход в Pine"
       description="Войдите по email и паролю, чтобы управлять профилем, объявлениями и сделками."
       footer={

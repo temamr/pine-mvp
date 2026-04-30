@@ -5,6 +5,12 @@ export function getSupabaseBrowserEnv() {
   };
 }
 
+export function getMapsBrowserEnv() {
+  return {
+    yandexMapsApiKey: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
+  };
+}
+
 export function isSupabaseConfigured() {
   const env = getSupabaseBrowserEnv();
   return Boolean(env.url && env.anonKey);

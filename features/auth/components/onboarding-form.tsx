@@ -23,9 +23,9 @@ export function OnboardingForm() {
   const [email, setEmail] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [bio, setBio] = React.useState("");
-  const [city, setCity] = React.useState("San Francisco");
-  const [region, setRegion] = React.useState("CA");
-  const [country, setCountry] = React.useState("US");
+  const [city, setCity] = React.useState("Москва");
+  const [region, setRegion] = React.useState("Москва");
+  const [country, setCountry] = React.useState("Россия");
   const [avatarUrl, setAvatarUrl] = React.useState("");
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
 
@@ -61,9 +61,9 @@ export function OnboardingForm() {
           profile.location && typeof profile.location === "object" && !Array.isArray(profile.location)
             ? profile.location
             : {};
-        setCity(typeof location.city === "string" ? location.city : "San Francisco");
-        setRegion(typeof location.region === "string" ? location.region : "CA");
-        setCountry(typeof location.country === "string" ? location.country : "US");
+        setCity(typeof location.city === "string" ? location.city : "Москва");
+        setRegion(typeof location.region === "string" ? location.region : "Москва");
+        setCountry(typeof location.country === "string" ? location.country : "Россия");
       } else {
         setDisplayName(user.email?.split("@")[0] ?? "");
       }
@@ -97,7 +97,7 @@ export function OnboardingForm() {
     event.preventDefault();
 
     if (!configured) {
-      toast({ title: "Supabase не настроен", description: "Onboarding сохранится после env setup." });
+      toast({ title: "Проект еще не настроен", description: "Сохранение профиля станет доступно после подключения базы." });
       return;
     }
 
@@ -138,7 +138,7 @@ export function OnboardingForm() {
     } catch (error) {
       toast({
         title: "Не удалось сохранить",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setSaving(false);
@@ -151,17 +151,15 @@ export function OnboardingForm() {
     <div className="mx-auto grid max-w-3xl gap-6">
       <Card className="bg-white/94 shadow-soft">
         <CardHeader>
-          <Badge variant="secondary" className="w-fit">Profile onboarding</Badge>
-          <CardTitle className="mt-2 text-2xl">Заполните профиль Pine</CardTitle>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Этот профиль хранится в таблице <code>profiles</code>, а аватар загружается в Supabase Storage bucket <code>avatars</code>.
-          </p>
+          <Badge variant="secondary" className="w-fit">Профиль</Badge>
+          <CardTitle className="mt-2 text-2xl">Заполните данные профиля</CardTitle>
+          <p className="text-sm leading-6 text-muted-foreground">Укажите имя, фото и ваш город, чтобы покупателям было проще вам доверять.</p>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Проверяю session
+              Загружаю профиль
             </div>
           ) : (
             <form className="grid gap-5" onSubmit={submit}>
@@ -172,7 +170,7 @@ export function OnboardingForm() {
                 </Avatar>
                 <label className="flex min-h-24 flex-1 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-background p-4 text-center">
                   <UploadCloud className="h-6 w-6 text-primary" />
-                  <span className="mt-2 text-sm font-semibold">Загрузить avatar</span>
+                  <span className="mt-2 text-sm font-semibold">Загрузить фото профиля</span>
                   <span className="text-xs text-muted-foreground">PNG или JPG</span>
                   <input
                     className="sr-only"
@@ -184,7 +182,7 @@ export function OnboardingForm() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="grid gap-2 text-sm font-medium">
-                  Display name
+                  Имя
                   <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
                 </label>
                 <label className="grid gap-2 text-sm font-medium">
@@ -193,20 +191,20 @@ export function OnboardingForm() {
                 </label>
               </div>
               <label className="grid gap-2 text-sm font-medium">
-                About
-                <Textarea value={bio} onChange={(event) => setBio(event.target.value)} placeholder="Что вы обычно покупаете или продаете?" />
+                О себе
+                <Textarea value={bio} onChange={(event) => setBio(event.target.value)} placeholder="Например: быстро отвечаю, бережно упаковываю технику, могу показать тесты устройства." />
               </label>
               <div className="grid gap-4 sm:grid-cols-3">
                 <label className="grid gap-2 text-sm font-medium">
-                  City
+                  Город
                   <Input value={city} onChange={(event) => setCity(event.target.value)} />
                 </label>
                 <label className="grid gap-2 text-sm font-medium">
-                  Region
+                  Регион
                   <Input value={region} onChange={(event) => setRegion(event.target.value)} />
                 </label>
                 <label className="grid gap-2 text-sm font-medium">
-                  Country
+                  Страна
                   <Input value={country} onChange={(event) => setCountry(event.target.value)} />
                 </label>
               </div>

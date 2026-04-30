@@ -91,7 +91,7 @@ export function SupabaseDealsScreen() {
       <Card className="bg-card/92">
         <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Загружаю safe deals
+          Загружаю сделки
         </CardContent>
       </Card>
     );
@@ -101,7 +101,7 @@ export function SupabaseDealsScreen() {
     return (
       <EmptyState
         title="Войдите, чтобы открыть сделки"
-        description="Safe deal lifecycle привязан к покупателю и продавцу в Supabase."
+        description="Отслеживание сделки доступно только авторизованным пользователям."
         actionLabel="Войти"
         actionHref="/auth/sign-in?redirectTo=/deals"
         icon={<PackageCheck className="h-6 w-6" />}
@@ -113,7 +113,7 @@ export function SupabaseDealsScreen() {
     return (
       <EmptyState
         title="Сделок пока нет"
-        description="Safe deal создается из чата после принятого оффера."
+        description="Сделка появляется после принятого оффера в чате."
         actionLabel="Открыть чат"
         actionHref="/chat"
         icon={<PackageCheck className="h-6 w-6" />}
@@ -127,14 +127,14 @@ export function SupabaseDealsScreen() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <PackageCheck className="h-5 w-5 text-primary" />
-            Safe deal / delivery
+            Сделки
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm text-muted-foreground">
-          <p>Supabase lifecycle: created → payment pending → reserved → handoff/transit/inspection → completed.</p>
+          <p>Здесь можно следить за этапами передачи товара, доставки и завершения сделки.</p>
           <p className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            Escrow остается state machine без реального платежного провайдера.
+            Все ключевые этапы фиксируются в истории сделки.
           </p>
         </CardContent>
       </Card>
@@ -162,8 +162,13 @@ export function SupabaseDealsScreen() {
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/listings/${deal.listingId}`}>Открыть товар</Link>
                     </Button>
+                    {deal.status === "completed" ? (
+                      <Button asChild size="sm">
+                        <Link href={`/profile?tab=reviews&reviewDeal=${deal.id}`}>Оставить отзыв</Link>
+                      </Button>
+                    ) : null}
                   </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {nextStatuses.map((status) => (
                       <Button
                         key={status}
@@ -187,7 +192,7 @@ export function SupabaseDealsScreen() {
                   </div>
                 </div>
                 <div className="grid content-start gap-3">
-                  <p className="font-semibold">Timeline</p>
+                  <p className="font-semibold">История</p>
                   {deal.timeline.map((event) => (
                     <div key={event.id} className="rounded-lg border bg-background p-3">
                       <p className="font-semibold">{event.label}</p>

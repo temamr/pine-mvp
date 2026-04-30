@@ -36,7 +36,7 @@ export function SupabaseNotificationsScreen() {
     } catch (error) {
       toast({
         title: "Уведомления не загрузились",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setLoading(false);
@@ -75,7 +75,7 @@ export function SupabaseNotificationsScreen() {
     } catch (error) {
       toast({
         title: "Статус не обновлен",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusy(null);
@@ -100,7 +100,7 @@ export function SupabaseNotificationsScreen() {
     } catch (error) {
       toast({
         title: "Не удалось прочитать все",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusy(null);
@@ -122,7 +122,7 @@ export function SupabaseNotificationsScreen() {
     return (
       <EmptyState
         title="Войдите, чтобы открыть уведомления"
-        description="In-app notifications привязаны к вашему Supabase profile."
+        description="Уведомления о сообщениях, офферах и сделках доступны после входа."
         actionLabel="Войти"
         actionHref="/auth/sign-in?redirectTo=/notifications"
         icon={<Bell className="h-6 w-6" />}
@@ -147,7 +147,7 @@ export function SupabaseNotificationsScreen() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {unreadCount} новых событий по сообщениям, офферам, модерации и сделкам. Новые события приходят через Supabase Realtime.
+            {unreadCount} новых событий по сообщениям, офферам, модерации и сделкам.
           </p>
         </CardContent>
       </Card>

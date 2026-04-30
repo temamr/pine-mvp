@@ -34,8 +34,12 @@ import { cn } from "@/lib/utils/cn";
 import { formatMoney, formatRelativeDate } from "@/lib/utils/format";
 import { dealTypeLabel, listingStatusLabel, offerStatusLabel } from "@/lib/utils/labels";
 
-const quickReplies = ["Да, доступно", "Могу сегодня после 18:00", "Пришлите еще фото", "Готов оформить через Pine"];
-const dealTypes: DealType[] = ["meetup", "courier", "pine_check"];
+const quickReplies = ["Да, в наличии", "Могу сегодня после 18:00", "Пришлю дополнительные фото", "Готов оформить сделку"];
+const dealTypeActions = [
+  { id: "meetup", type: "meetup" as DealType, title: "Личная встреча", description: "Встречаетесь лично и подтверждаете завершение после передачи товара." },
+  { id: "courier-seller", type: "courier" as DealType, title: "Доставка за счет продавца", description: "Продавец берет доставку на себя, а статус отправки отслеживается в сделке." },
+  { id: "courier-buyer", type: "courier" as DealType, title: "Доставка за счет покупателя", description: "Стоимость доставки оплачивает покупатель, а статус идет по этапам сделки." }
+] as const;
 
 type ThreadState = {
   conversation: Conversation | null;
@@ -74,6 +78,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
   const canCreateOffer = Boolean(selected && selected.buyerId === currentUserId);
   const acceptedOffer = thread.offers.find((offer) => offer.status === "accepted");
   const lowball = listing ? Number(offerAmount) > 0 && Number(offerAmount) < listing.price.amount * 0.75 : false;
+  const dealLocked = selected?.status === "completed" || listing?.status === "sold";
 
   const reloadConversations = React.useCallback(async () => {
     setConversationLoading(true);
@@ -227,7 +232,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
         ...current,
         messages: upsertById(current.messages, message).sort(sortByCreatedAt)
       }));
-      toast({ title: "Вложение добавлено", description: "На Stage 6 это placeholder без загрузки в Storage." });
+      toast({ title: "Вложение добавлено", description: "Файл отмечен в диалоге." });
     } catch (error) {
       toast({
         title: "Вложение не отправлено",
@@ -264,7 +269,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
     } catch (error) {
       toast({
         title: "Оффер не отправлен",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusyAction(null);
@@ -304,7 +309,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
     } catch (error) {
       toast({
         title: "Статус оффера не обновлен",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusyAction(null);
@@ -320,12 +325,12 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
 
     try {
       await createSupabaseSafeDeal(selected.id, type);
-      toast({ title: "Safe deal создана", description: `${dealTypeLabel[type]} добавлена в сделки.` });
+      toast({ title: "Сделка создана", description: `${dealTypeLabel[type]} добавлена в ваши сделки.` });
       router.push("/deals");
     } catch (error) {
-      const description = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+      const description = error instanceof Error ? error.message : "Попробуйте еще раз.";
       toast({
-        title: "Safe deal не создана",
+        title: "Сделка не создана",
         description: description.includes("accepted_offer_required")
           ? "Сначала продавец должен принять оффер в этом диалоге."
           : description
@@ -348,7 +353,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
     return (
       <EmptyState
         title="Войдите, чтобы открыть чат"
-        description="Realtime-диалоги, офферы и резерв товара доступны авторизованным пользователям."
+        description="Диалоги, офферы и резерв товара доступны авторизованным пользователям."
         actionLabel="Войти"
         actionHref="/auth/sign-in?redirectTo=/chat"
         icon={<MessageSquare className="h-6 w-6" />}
@@ -360,7 +365,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
     return (
       <EmptyState
         title="Диалогов пока нет"
-        description="Откройте карточку электроники и нажмите «Написать», чтобы создать conversation в Supabase."
+        description="Откройте объявление и нажмите «Написать», чтобы начать диалог с продавцом."
         actionLabel="В каталог"
         actionHref="/"
         icon={<MessageSquare className="h-6 w-6" />}
@@ -423,41 +428,39 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
                 </div>
                 <Sheet>
                   <SheetTrigger asChild>
-                    <Button variant="secondary">
+                    <Button variant="secondary" disabled={dealLocked}>
                       <PackageCheck className="h-4 w-4" />
-                      Оформить сделку
+                      {dealLocked ? "Сделка завершена" : "Оформить сделку"}
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="right">
                     <SheetHeader>
-                      <SheetTitle>Safe deal</SheetTitle>
+                      <SheetTitle>Оформление сделки</SheetTitle>
                     </SheetHeader>
                     <div className="mt-6 grid gap-3">
-                      {!acceptedOffer ? (
+                      {dealLocked ? (
+                        <div className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">
+                          По этому диалогу сделка уже завершена. Повторное оформление недоступно.
+                        </div>
+                      ) : !acceptedOffer ? (
                         <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900 dark:border-yellow-500/40 dark:bg-yellow-500/15 dark:text-yellow-100">
-                          Для safe deal нужен принятый оффер. После accept Pine возьмет сумму из оффера и запустит lifecycle сделки.
+                          Для оформления сделки нужен принятый оффер. После принятия цена подтянется автоматически.
                         </div>
                       ) : (
                         <div className="rounded-lg border bg-background p-3 text-sm">
                           <p className="font-semibold">Принятый оффер: {formatMoney(acceptedOffer.amount)}</p>
-                          <p className="mt-1 text-muted-foreground">Сумма будет закреплена в сделке.</p>
+                          <p className="mt-1 text-muted-foreground">Эта сумма будет закреплена в сделке.</p>
                         </div>
                       )}
-                      {dealTypes.map((type) => (
+                      {dealTypeActions.map((item) => (
                         <button
-                          key={type}
+                          key={item.id}
                           className="rounded-lg border bg-background p-4 text-left transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={!acceptedOffer || busyAction === `deal:${type}`}
-                          onClick={() => startSafeDeal(type)}
+                          disabled={dealLocked || !acceptedOffer || busyAction === `deal:${item.type}`}
+                          onClick={() => startSafeDeal(item.type)}
                         >
-                          <p className="font-semibold">{dealTypeLabel[type]}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {type === "meetup"
-                              ? "Личная встреча с подтверждением завершения."
-                              : type === "courier"
-                                ? "Курьерский сценарий с доставочным timeline."
-                                : "Проверка состояния через Pine перед финальным подтверждением."}
-                          </p>
+                          <p className="font-semibold">{item.title}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                         </button>
                       ))}
                     </div>
@@ -549,13 +552,13 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
                     />
                     {lowball ? (
                       <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900 dark:border-yellow-500/40 dark:bg-yellow-500/15 dark:text-yellow-100">
-                        Это lowball-оффер. Добавьте контекст, чтобы не потерять ответ.
+                        Это слишком низкое предложение. Лучше коротко пояснить причину своей цены.
                       </div>
                     ) : null}
                     <Textarea value={offerMessage} onChange={(event) => setOfferMessage(event.target.value)} />
                     {!canCreateOffer ? (
                       <p className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
-                        Оффер отправляет покупатель. Продавец отвечает кнопками принять, отклонить или контрить.
+                        Оффер отправляет покупатель. Продавец может принять предложение, отклонить его или ответить встречной ценой.
                       </p>
                     ) : null}
                     <Button disabled={busyAction === "offer" || !canCreateOffer} onClick={submitOffer}>
@@ -574,7 +577,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
                         ))
                       ) : (
                         <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-                          Офферов пока нет. Предложение появится здесь и синхронизируется через Supabase Realtime.
+                          Офферов пока нет. Как только кто-то предложит цену, история появится здесь.
                         </p>
                       )}
                     </div>
@@ -586,7 +589,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
         ) : (
           <EmptyState
             title="Выберите диалог"
-            description="Conversation уже хранится в Supabase, сообщения и офферы загрузятся после выбора."
+            description="Откройте диалог слева, чтобы увидеть переписку, офферы и статус сделки."
             icon={<MessageSquare className="h-6 w-6" />}
           />
         )}

@@ -181,7 +181,7 @@ export async function createSupabaseListingFromDraft(input: SupabaseListingDraft
 
   const status = input.submitToModeration ? "pending" : "draft";
   const attributes: Json = [
-    { label: "Источник", value: "Supabase listing wizard" },
+    { label: "Источник", value: "Веб-публикация" },
     { label: "Готовность", value: input.submitToModeration ? "На модерации" : "Черновик" }
   ];
 
@@ -193,14 +193,14 @@ export async function createSupabaseListingFromDraft(input: SupabaseListingDraft
       title: input.title,
       description: input.description,
       price_amount: input.price,
-      currency: "USD",
+      currency: "RUB",
       condition: input.condition,
       status,
       attributes,
       location: {
         city: input.locationLabel,
-        region: "CA",
-        country: "US",
+        region: "Россия",
+        country: "Россия",
         label: input.locationLabel
       }
     })
@@ -237,12 +237,7 @@ async function uploadAndInsertImages(
   listingId: ID,
   input: SupabaseListingDraft
 ) {
-  const fallbackImages =
-    input.imageUrls.length > 0
-      ? input.imageUrls
-      : ["https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80"];
-
-  const imageInputs = fallbackImages.slice(0, 10);
+  const imageInputs = input.imageUrls.slice(0, 10);
   const rows = await Promise.all(
     imageInputs.map(async (url, index) => {
       const file = input.imageFiles[index];

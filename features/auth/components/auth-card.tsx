@@ -32,7 +32,7 @@ export function AuthCard({ title, eyebrow, description, children, footer }: Auth
               <div className="flex gap-2">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>
-                  Supabase env не настроен. Заполните <code>.env.local</code>, чтобы auth-запросы пошли в проект.
+                  Вход пока недоступен. Проверьте настройки проекта и попробуйте снова.
                 </p>
               </div>
             </div>

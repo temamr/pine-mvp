@@ -303,16 +303,14 @@ export const usePineStore = create<StoreState>((set, get) => ({
   },
 
   createListing(payload) {
-    const imageUrls = payload.imageUrls.length
-      ? payload.imageUrls
-      : ["https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80"];
+    const imageUrls = payload.imageUrls;
     const listing: Listing = {
       id: uid("listing"),
       sellerId: get().currentUserId,
       categoryId: payload.categoryId,
       title: payload.title,
       description: payload.description,
-      price: { amount: payload.price, currency: "USD" },
+      price: { amount: payload.price, currency: "RUB" },
       condition: payload.condition,
       status: payload.submitToModeration ? "pending" : "draft",
       images: imageUrls.map((url, index) => ({
@@ -322,13 +320,13 @@ export const usePineStore = create<StoreState>((set, get) => ({
         position: index
       })),
       attributes: [
-        { label: "Источник", value: "Создано в mock wizard" },
+        { label: "Источник", value: "Веб-публикация" },
         { label: "Готовность", value: payload.submitToModeration ? "На модерации" : "Черновик" }
       ],
       location: {
         city: payload.locationLabel,
-        region: "CA",
-        country: "US",
+        region: "Россия",
+        country: "Россия",
         label: payload.locationLabel
       },
       viewsCount: 0,

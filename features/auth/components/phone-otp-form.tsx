@@ -22,7 +22,7 @@ export function PhoneOtpForm() {
     event.preventDefault();
 
     if (!configured) {
-      toast({ title: "Supabase не настроен", description: "Phone auth заработает после env setup." });
+      toast({ title: "Вход по телефону недоступен", description: "Проверьте настройки проекта и попробуйте снова." });
       return;
     }
 
@@ -32,7 +32,7 @@ export function PhoneOtpForm() {
     setLoading(false);
 
     if (error) {
-      toast({ title: "OTP error", description: error.message });
+      toast({ title: "Не удалось отправить код", description: error.message });
       return;
     }
 
@@ -53,11 +53,11 @@ export function PhoneOtpForm() {
     setLoading(false);
 
     if (error) {
-      toast({ title: "OTP error", description: error.message });
+      toast({ title: "Код не подошел", description: error.message });
       return;
     }
 
-    toast({ title: "Телефон подтвержден", description: "Перенаправляю в onboarding." });
+    toast({ title: "Телефон подтвержден", description: "Перенаправляю к заполнению профиля." });
     router.push("/onboarding");
     router.refresh();
   }
@@ -66,7 +66,7 @@ export function PhoneOtpForm() {
     return (
       <form className="grid gap-4" onSubmit={verifyOtp}>
         <label className="grid gap-2 text-sm font-medium">
-          SMS code
+          Код из SMS
           <Input value={token} onChange={(event) => setToken(event.target.value)} inputMode="numeric" required />
         </label>
         <Button disabled={loading}>
@@ -83,12 +83,12 @@ export function PhoneOtpForm() {
   return (
     <form className="grid gap-4" onSubmit={sendOtp}>
       <label className="grid gap-2 text-sm font-medium">
-        Phone number
-        <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+15551234567" required />
+        Номер телефона
+        <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+79991234567" required />
       </label>
       <Button disabled={loading}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Отправить OTP
+        Отправить код
       </Button>
     </form>
   );

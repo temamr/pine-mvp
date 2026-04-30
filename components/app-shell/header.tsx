@@ -1,8 +1,9 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, Heart, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,7 +17,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/toast";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
-import { primaryNavItems, secondaryNavItems } from "@/components/app-shell/nav-items";
+import { Badge } from "@/components/ui/badge";
+import { getPrimaryNavItems, getSecondaryNavItems } from "@/components/app-shell/nav-items";
 import { useSupabaseSession } from "@/features/auth/components/use-supabase-session";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { PINE_BRAND } from "@/lib/theme";
@@ -25,7 +27,12 @@ export function Header() {
   const router = useRouter();
   const { toast } = useToast();
   const { configured, loading, user, profile } = useSupabaseSession();
-  const displayName = configured ? profile?.display_name ?? user?.email ?? "Pine user" : "Eli Parker";
+  const userId = user?.id ?? null;
+  const [unreadNotifications, setUnreadNotifications] = React.useState(0);
+  const [favoritesCount, setFavoritesCount] = React.useState(0);
+  const primaryNavItems = getPrimaryNavItems();
+  const secondaryNavItems = getSecondaryNavItems(profile?.role);
+  const displayName = configured ? profile?.display_name ?? user?.email ?? "Пользователь Pine" : "Eli Parker";
   const avatarUrl = configured
     ? profile?.avatar_url ?? undefined
     : "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80";
@@ -36,15 +43,75 @@ export function Header() {
     .slice(0, 2)
     .toUpperCase();
 
+  React.useEffect(() => {
+    if (!configured || !userId) {
+      setUnreadNotifications(0);
+      setFavoritesCount(0);
+      return;
+    }
+
+    let active = true;
+    const supabase = createSupabaseBrowserClient();
+    const authenticatedUserId: string = userId;
+
+    async function loadBadges() {
+      const [{ count: notificationCount }, { count: favoriteCount }] = await Promise.all([
+        supabase
+          .from("notifications")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", authenticatedUserId)
+          .is("read_at", null),
+        supabase
+          .from("favorites")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", authenticatedUserId)
+          .is("archived_at", null)
+      ]);
+
+      if (!active) {
+        return;
+      }
+
+      setUnreadNotifications(notificationCount ?? 0);
+      setFavoritesCount(favoriteCount ?? 0);
+    }
+
+    void loadBadges();
+
+    const notificationsChannel = supabase
+      .channel(`header-notifications:${authenticatedUserId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${authenticatedUserId}` },
+        () => void loadBadges()
+      )
+      .subscribe();
+
+    const favoritesChannel = supabase
+      .channel(`header-favorites:${authenticatedUserId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "favorites", filter: `user_id=eq.${authenticatedUserId}` },
+        () => void loadBadges()
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      void supabase.removeChannel(notificationsChannel);
+      void supabase.removeChannel(favoritesChannel);
+    };
+  }, [configured, userId]);
+
   async function signOut() {
     if (!configured) {
-      toast({ title: "Demo mode", description: "Auth подключается через Supabase env." });
+      toast({ title: "Демо-режим", description: "Вход станет доступен после настройки проекта." });
       return;
     }
 
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
-    toast({ title: "Вы вышли", description: "Session очищена." });
+    toast({ title: "Вы вышли", description: "До встречи." });
     router.push("/");
     router.refresh();
   }
@@ -92,14 +159,30 @@ export function Header() {
         </div>
 
         <Button asChild className="ml-auto hidden md:inline-flex">
-          <Link href="/sell">Разместить</Link>
+          <Link href="/sell">Создать объявление</Link>
         </Button>
 
         <ThemeToggle />
 
-        <Button asChild variant="ghost" size="icon" aria-label="Уведомления">
+        <Button asChild variant="ghost" size="icon" aria-label="Избранное" className="relative">
+          <Link href="/favorites">
+            <Heart className="h-5 w-5" />
+            {favoritesCount ? (
+              <Badge className="absolute -right-1 -top-1 h-5 min-w-5 justify-center rounded-full px-1 text-[10px]">
+                {favoritesCount > 99 ? "99+" : favoritesCount}
+              </Badge>
+            ) : null}
+          </Link>
+        </Button>
+
+        <Button asChild variant="ghost" size="icon" aria-label="Уведомления" className="relative">
           <Link href="/notifications">
             <Bell className="h-5 w-5" />
+            {unreadNotifications ? (
+              <Badge className="absolute -right-1 -top-1 h-5 min-w-5 justify-center rounded-full px-1 text-[10px]">
+                {unreadNotifications > 99 ? "99+" : unreadNotifications}
+              </Badge>
+            ) : null}
           </Link>
         </Button>
 
@@ -122,7 +205,7 @@ export function Header() {
                 <Link href="/profile">Профиль</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/onboarding">Onboarding</Link>
+                <Link href="/onboarding">Редактировать профиль</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/profile/listings">Мои объявления</Link>

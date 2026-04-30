@@ -142,7 +142,7 @@ export function SupabaseFavoritesScreen() {
     return (
       <EmptyState
         title="Войдите, чтобы сохранять товары"
-        description="Избранное хранится в Supabase и привязано к вашему профилю."
+        description="Сохраняйте интересные товары и возвращайтесь к ним позже."
         actionLabel="Войти"
         actionHref="/auth/sign-in?redirectTo=/favorites"
       />
@@ -162,7 +162,7 @@ export function SupabaseFavoritesScreen() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Сохраненные товары загружаются из Supabase favorites.</p>
+          <p className="text-sm text-muted-foreground">Следите за ценой, наличием и статусом продажи по сохраненным товарам.</p>
         </CardContent>
       </Card>
 
@@ -179,8 +179,8 @@ export function SupabaseFavoritesScreen() {
                   <ListingCard listing={item.listing} onFavoriteClick={toggleFavorite} />
                   <div className="flex items-center justify-between rounded-lg border bg-white p-2">
                     <div className="flex gap-2">
-                      {item.priceChangedAt ? <Badge variant="warning">price changed</Badge> : null}
-                      {item.soldNotifiedAt ? <Badge variant="muted">sold</Badge> : null}
+                      {item.priceChangedAt ? <Badge variant="warning">Цена изменилась</Badge> : null}
+                      {item.soldNotifiedAt ? <Badge variant="muted">Продано</Badge> : null}
                     </div>
                     <Button variant="outline" size="sm" onClick={() => void archive(item.listingId)}>
                       <Archive className="h-4 w-4" />

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import * as React from "react";
 import { BottomNav } from "@/components/app-shell/bottom-nav";
+import { Footer } from "@/components/app-shell/footer";
 import { Header } from "@/components/app-shell/header";
 import { SidebarNav } from "@/components/app-shell/sidebar-nav";
 
@@ -16,6 +17,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <SidebarNav collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
         <main className="min-w-0 flex-1">{children}</main>
       </div>
+      <Footer />
       <BottomNav />
     </div>
   );

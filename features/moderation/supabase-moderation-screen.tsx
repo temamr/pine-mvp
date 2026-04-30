@@ -24,10 +24,22 @@ import {
 } from "@/features/moderation/lib/supabase-moderation";
 import { STATUS_TONE } from "@/lib/theme";
 import { formatRelativeDate } from "@/lib/utils/format";
-import { complaintStatusLabel, listingStatusLabel, moderationStatusLabel } from "@/lib/utils/labels";
+import {
+  complaintReasonLabel,
+  complaintStatusLabel,
+  complaintTargetTypeLabel,
+  listingStatusLabel,
+  moderationStatusLabel
+} from "@/lib/utils/labels";
 
 const reasons: Complaint["reason"][] = ["spam", "fraud", "prohibited_item", "abuse", "other"];
 const verificationStatuses: Database["public"]["Enums"]["verification_status"][] = ["none", "phone", "document", "trusted"];
+const verificationStatusLabel: Record<Database["public"]["Enums"]["verification_status"], string> = {
+  none: "Не подтвержден",
+  phone: "Телефон подтвержден",
+  document: "Документы подтверждены",
+  trusted: "Проверенный профиль"
+};
 
 export function SupabaseModerationScreen() {
   const { toast } = useToast();
@@ -39,7 +51,7 @@ export function SupabaseModerationScreen() {
   const [details, setDetails] = React.useState("");
   const [moderationNotes, setModerationNotes] = React.useState<Record<ID, string>>({});
   const [trustUserId, setTrustUserId] = React.useState("");
-  const [blockReason, setBlockReason] = React.useState("Repeated marketplace policy violation.");
+  const [blockReason, setBlockReason] = React.useState("Повторное нарушение правил площадки.");
   const [verificationStatus, setVerificationStatus] = React.useState<Database["public"]["Enums"]["verification_status"]>("trusted");
 
   const load = React.useCallback(async () => {
@@ -51,8 +63,8 @@ export function SupabaseModerationScreen() {
       setTargetId((current) => current || next.cases[0]?.listingId || "");
     } catch (error) {
       toast({
-        title: "Trust data не загрузились",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        title: "Раздел модерации не загрузился",
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setLoading(false);
@@ -65,7 +77,7 @@ export function SupabaseModerationScreen() {
 
   async function submitComplaint() {
     if (!targetId.trim()) {
-      toast({ title: "Укажите target ID", description: "Можно использовать listing, user или conversation ID." });
+      toast({ title: "Укажите ID объявления", description: "Например, возьмите его из карточки товара или списка модерации." });
       return;
     }
 
@@ -85,11 +97,11 @@ export function SupabaseModerationScreen() {
       });
       setData((current) => current ? { ...current, complaints: [complaint, ...current.complaints] } : current);
       setDetails("");
-      toast({ title: "Жалоба создана", description: "Статус теперь хранится в Supabase." });
+      toast({ title: "Жалоба создана", description: "Обращение зарегистрировано." });
     } catch (error) {
       toast({
         title: "Жалоба не создана",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusyAction(null);
@@ -112,13 +124,13 @@ export function SupabaseModerationScreen() {
       );
       toast({
         title: decision === "approved" ? "Объявление опубликовано" : "Статус модерации обновлен",
-        description: decision === "approved" ? "Объявление ушло в каталог." : "Seller feedback сохранен."
+        description: decision === "approved" ? "Объявление появилось в каталоге." : "Комментарий продавцу сохранен."
       });
       void load();
     } catch (error) {
       toast({
         title: "Модерация не сохранена",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusyAction(null);
@@ -142,7 +154,7 @@ export function SupabaseModerationScreen() {
     } catch (error) {
       toast({
         title: "Жалоба не обновлена",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusyAction(null);
@@ -154,12 +166,12 @@ export function SupabaseModerationScreen() {
 
     try {
       await blockSupabaseProfile(profileId, blockReason);
-      toast({ title: "Пользователь заблокирован", description: "blocked_at и причина записаны в profiles." });
+      toast({ title: "Пользователь заблокирован", description: "Доступ к площадке ограничен." });
       void load();
     } catch (error) {
       toast({
         title: "Пользователь не заблокирован",
-        description: error instanceof Error ? error.message : "Нужна admin role."
+        description: error instanceof Error ? error.message : "Для этого действия нужны права администратора."
       });
     } finally {
       setBusyAction(null);
@@ -168,7 +180,7 @@ export function SupabaseModerationScreen() {
 
   async function verifyUser() {
     if (!trustUserId.trim()) {
-      toast({ title: "Укажите User ID" });
+      toast({ title: "Укажите ID пользователя" });
       return;
     }
 
@@ -181,7 +193,7 @@ export function SupabaseModerationScreen() {
     } catch (error) {
       toast({
         title: "Верификация не обновлена",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusyAction(null);
@@ -193,7 +205,7 @@ export function SupabaseModerationScreen() {
       <Card className="bg-card/92">
         <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Загружаю Supabase Trust & Safety
+          Загружаю модерацию
         </CardContent>
       </Card>
     );
@@ -202,8 +214,8 @@ export function SupabaseModerationScreen() {
   if (!data?.userId) {
     return (
       <EmptyState
-        title="Войдите для Trust & Safety"
-        description="Жалобы и статусы модерации привязаны к Supabase profile."
+        title="Войдите, чтобы открыть модерацию"
+        description="Жалобы и очередь модерации доступны после входа."
         actionLabel="Войти"
         actionHref="/auth/sign-in?redirectTo=/moderation"
         icon={<ShieldCheck className="h-6 w-6" />}
@@ -219,16 +231,16 @@ export function SupabaseModerationScreen() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            Trust & Safety
+            Модерация и жалобы
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm leading-6 text-muted-foreground">
           <p>
-            Supabase mode: жалобы, очередь модерации, seller feedback, review counters и admin actions работают через RLS/RPC.
+            Здесь обрабатываются жалобы, очередь модерации и действия по безопасности площадки.
           </p>
           <p>
-            Текущая роль: <span className="font-semibold text-foreground">{currentData.profile?.role ?? "unknown"}</span>.
-            {!currentData.isStaff ? " Для очереди модерации нужна role moderator или admin." : null}
+            Текущая роль: <span className="font-semibold text-foreground">{currentData.profile?.role ?? "неизвестно"}</span>.
+            {!currentData.isStaff ? " Для работы с очередью модерации нужна роль moderator или admin." : null}
           </p>
         </CardContent>
       </Card>
@@ -238,7 +250,7 @@ export function SupabaseModerationScreen() {
           <TabsTrigger value="complaints">Жалобы</TabsTrigger>
           <TabsTrigger value="cases">Модерация объявлений</TabsTrigger>
           <TabsTrigger value="report">Создать жалобу</TabsTrigger>
-          <TabsTrigger value="tools">Trust tools</TabsTrigger>
+          <TabsTrigger value="tools">Инструменты</TabsTrigger>
         </TabsList>
 
         <TabsContent value="complaints">
@@ -259,22 +271,22 @@ export function SupabaseModerationScreen() {
                             <Badge variant={complaint.status === "resolved" ? "success" : complaint.status === "dismissed" ? "secondary" : "warning"}>
                               {complaintStatusLabel[complaint.status]}
                             </Badge>
-                            <Badge variant="outline" className="bg-background">{complaint.reason}</Badge>
-                            <Badge variant="outline" className="bg-background">{complaint.targetType}</Badge>
+                            <Badge variant="outline" className="bg-background">{complaintReasonLabel[complaint.reason]}</Badge>
+                            <Badge variant="outline" className="bg-background">{complaintTargetTypeLabel[complaint.targetType]}</Badge>
                           </div>
                           <p className="mt-2 font-semibold">{complaint.details}</p>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            Reporter: {reporter?.displayName ?? complaint.reporterId} · {formatRelativeDate(complaint.createdAt)}
+                            Автор жалобы: {reporter?.displayName ?? complaint.reporterId} · {formatRelativeDate(complaint.createdAt)}
                           </p>
                           {targetListing ? (
                             <p className="mt-1 text-sm text-muted-foreground">
-                              Listing: {targetListing.title} · seller {targetUser?.displayName ?? targetListing.sellerId}
+                              Объявление: {targetListing.title} · продавец {targetUser?.displayName ?? targetListing.sellerId}
                             </p>
                           ) : null}
                         </div>
                         {complaint.targetType === "listing" ? (
                           <Button asChild variant="outline" size="sm">
-                            <Link href={`/listings/${complaint.targetId}`}>Открыть target</Link>
+                            <Link href={`/listings/${complaint.targetId}`}>Открыть объявление</Link>
                           </Button>
                         ) : null}
                       </div>
@@ -292,7 +304,7 @@ export function SupabaseModerationScreen() {
                           {currentData.isAdmin && targetUserId ? (
                             <Button size="sm" variant="destructive" disabled={busyAction === `block:${targetUserId}`} onClick={() => blockUser(targetUserId)}>
                               <UserX className="h-4 w-4" />
-                              Заблокировать target
+                              Заблокировать пользователя
                             </Button>
                           ) : null}
                         </div>
@@ -304,7 +316,7 @@ export function SupabaseModerationScreen() {
             ) : (
               <EmptyState
                 title="Жалоб пока нет"
-                description="Созданные обращения появятся здесь и будут храниться в Supabase."
+                description="Новые обращения появятся здесь."
                 icon={<Flag className="h-6 w-6" />}
               />
             )}
@@ -315,7 +327,7 @@ export function SupabaseModerationScreen() {
           {!currentData.isStaff ? (
             <EmptyState
               title="Нужна роль moderator или admin"
-              description="Обычный пользователь видит только собственные жалобы и seller feedback."
+              description="Обычному пользователю этот раздел недоступен."
               icon={<ShieldAlert className="h-6 w-6" />}
             />
           ) : (
@@ -374,7 +386,7 @@ export function SupabaseModerationScreen() {
               ) : (
                 <EmptyState
                   title="Очередь модерации пуста"
-                  description="Новые pending listings появятся здесь после отправки объявления на проверку."
+                  description="Новые объявления для проверки появятся здесь после отправки на модерацию."
                   icon={<ShieldCheck className="h-6 w-6" />}
                 />
               )}
@@ -392,13 +404,13 @@ export function SupabaseModerationScreen() {
             </CardHeader>
             <CardContent className="grid gap-4">
               <label className="grid gap-2 text-sm font-medium">
-                Listing ID
+                ID объявления
                 <Input value={targetId} onChange={(event) => setTargetId(event.target.value)} />
               </label>
               <label className="grid gap-2 text-sm font-medium">
                 Причина
                 <select value={reason} onChange={(event) => setReason(event.target.value as Complaint["reason"])} className="h-11 rounded-lg border bg-background px-3 text-sm">
-                  {reasons.map((item) => <option key={item} value={item}>{item}</option>)}
+                  {reasons.map((item) => <option key={item} value={item}>{complaintReasonLabel[item]}</option>)}
                 </select>
               </label>
               <label className="grid gap-2 text-sm font-medium">
@@ -416,28 +428,28 @@ export function SupabaseModerationScreen() {
         <TabsContent value="tools">
           <Card className="bg-card/92">
             <CardHeader>
-              <CardTitle>Admin / moderator tools</CardTitle>
+              <CardTitle>Инструменты модератора</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
               <label className="grid gap-2 text-sm font-medium">
-                User ID
-                <Input value={trustUserId} onChange={(event) => setTrustUserId(event.target.value)} placeholder="profile uuid" />
+                ID пользователя
+                <Input value={trustUserId} onChange={(event) => setTrustUserId(event.target.value)} placeholder="UUID профиля" />
               </label>
               <label className="grid gap-2 text-sm font-medium">
-                Verification status
+                Статус верификации
                 <select
                   value={verificationStatus}
                   onChange={(event) => setVerificationStatus(event.target.value as Database["public"]["Enums"]["verification_status"])}
                   className="h-11 rounded-lg border bg-background px-3 text-sm"
                 >
-                  {verificationStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                  {verificationStatuses.map((status) => <option key={status} value={status}>{verificationStatusLabel[status]}</option>)}
                 </select>
               </label>
               <Button className="w-fit" disabled={busyAction === "verify" || !currentData.isStaff} onClick={verifyUser}>
                 Обновить верификацию
               </Button>
               <label className="grid gap-2 text-sm font-medium">
-                Block reason
+                Причина блокировки
                 <Textarea value={blockReason} onChange={(event) => setBlockReason(event.target.value)} />
               </label>
               <Button className="w-fit" variant="destructive" disabled={!currentData.isAdmin || !trustUserId.trim()} onClick={() => blockUser(trustUserId)}>
@@ -445,7 +457,7 @@ export function SupabaseModerationScreen() {
                 Заблокировать пользователя
               </Button>
               {!currentData.isAdmin ? (
-                <p className="text-sm text-muted-foreground">Блокировка требует role admin. Верификация доступна moderator/admin.</p>
+                <p className="text-sm text-muted-foreground">Блокировка доступна только администратору. Верификация доступна модератору и администратору.</p>
               ) : null}
             </CardContent>
           </Card>

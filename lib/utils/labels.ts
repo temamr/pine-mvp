@@ -48,8 +48,8 @@ export const dealStatusLabel: Record<Deal["status"], string> = {
 
 export const dealTypeLabel: Record<Deal["type"], string> = {
   meetup: "Личная встреча",
-  courier: "Курьерская доставка",
-  pine_check: "Проверка Pine"
+  courier: "Доставка",
+  pine_check: "Проверка товара"
 };
 
 export const complaintStatusLabel: Record<Complaint["status"], string> = {
@@ -57,6 +57,20 @@ export const complaintStatusLabel: Record<Complaint["status"], string> = {
   reviewing: "На проверке",
   resolved: "Решена",
   dismissed: "Отклонена"
+};
+
+export const complaintReasonLabel: Record<Complaint["reason"], string> = {
+  spam: "Спам",
+  fraud: "Мошенничество",
+  prohibited_item: "Запрещенный товар",
+  abuse: "Оскорбления",
+  other: "Другое"
+};
+
+export const complaintTargetTypeLabel: Record<Complaint["targetType"], string> = {
+  listing: "Объявление",
+  user: "Пользователь",
+  conversation: "Диалог"
 };
 
 export const moderationStatusLabel: Record<ModerationCase["status"], string> = {

@@ -3,9 +3,9 @@ import { ru } from "date-fns/locale";
 import type { Money } from "@/lib/domain";
 
 export function formatMoney(money: Money) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("ru-RU", {
     style: "currency",
-    currency: money.currency,
+    currency: "RUB",
     maximumFractionDigits: 0
   }).format(money.amount);
 }

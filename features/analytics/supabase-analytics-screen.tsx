@@ -40,7 +40,7 @@ export function SupabaseAnalyticsScreen() {
     try {
       setMetrics(await fetchSupabaseAnalyticsDashboard());
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+      const message = error instanceof Error ? error.message : "Попробуйте еще раз.";
       if (message.includes("not_allowed")) {
         setBlocked(true);
       } else {
@@ -72,8 +72,8 @@ export function SupabaseAnalyticsScreen() {
   if (blocked) {
     return (
       <EmptyState
-        title="Нужна роль moderator или admin"
-        description="Supabase analytics dashboard читает агрегированные продуктовые метрики только для Trust/ops команды."
+        title="Нужна роль модератора или администратора"
+        description="Раздел с метриками доступен только команде модерации и администраторам."
         actionLabel="Открыть профиль"
         actionHref="/profile"
         icon={<BarChart3 className="h-6 w-6" />}
@@ -97,7 +97,7 @@ export function SupabaseAnalyticsScreen() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Supabase dashboard для воронки view → chat → offer → deal и качества модерации.
+            Здесь собраны ключевые продуктовые метрики: просмотры, диалоги, офферы, сделки и качество модерации.
           </p>
         </CardContent>
       </Card>
@@ -106,25 +106,24 @@ export function SupabaseAnalyticsScreen() {
         <Metric title="Завершенные сделки" value={metrics.completedDealsCount} icon={<PackageCheck className="h-5 w-5" />} />
         <Metric title="Начатые диалоги" value={metrics.startedConversationsCount} icon={<MessageCircle className="h-5 w-5" />} />
         <Metric title="Офферы" value={metrics.offersCount} icon={<Tag className="h-5 w-5" />} />
-        <Metric title="Listing views" value={metrics.listingViewsCount} icon={<BarChart3 className="h-5 w-5" />} />
+        <Metric title="Просмотры объявлений" value={metrics.listingViewsCount} icon={<BarChart3 className="h-5 w-5" />} />
       </div>
 
       <Card className="bg-card/92">
         <CardContent className="grid gap-4 p-5 md:grid-cols-3">
-          <MetricBlock title="View → Chat" value={`${metrics.viewToChatConversion}%`} />
-          <MetricBlock title="Chat → Offer" value={`${metrics.chatToOfferConversion}%`} />
-          <MetricBlock title="Offer → Deal" value={`${metrics.offerToDealConversion}%`} />
-          <MetricBlock title="Offer acceptance rate" value={`${metrics.offerAcceptanceRate}%`} />
-          <MetricBlock title="Time to first reaction" value={`${metrics.timeToFirstReactionMinutes}m`} />
-          <MetricBlock title="First-pass moderation" value={`${metrics.firstPassModerationApprovalRate}%`} />
+          <MetricBlock title="Просмотр → Чат" value={`${metrics.viewToChatConversion}%`} />
+          <MetricBlock title="Чат → Оффер" value={`${metrics.chatToOfferConversion}%`} />
+          <MetricBlock title="Оффер → Сделка" value={`${metrics.offerToDealConversion}%`} />
+          <MetricBlock title="Доля принятых офферов" value={`${metrics.offerAcceptanceRate}%`} />
+          <MetricBlock title="До первой реакции" value={`${metrics.timeToFirstReactionMinutes} мин`} />
+          <MetricBlock title="Одобрение с первого раза" value={`${metrics.firstPassModerationApprovalRate}%`} />
         </CardContent>
       </Card>
 
       <Card className="bg-card/92">
         <CardContent className="p-5 text-sm leading-6 text-muted-foreground">
-          События пишутся через database triggers и browser helpers: listing viewed, chat started, offer sent,
-          offer accepted, deal created, deal completed, moderation approved/rejected, favorite added, search used,
-          filters applied. Роли для доступа к dashboard задаются в <Link href="/moderation" className="font-semibold text-primary">Trust & Safety</Link>.
+          Метрики обновляются по просмотрам объявлений, начатым диалогам, офферам, сделкам, избранному и действиям модерации.
+          Права доступа к этому разделу настраиваются в <Link href="/moderation" className="font-semibold text-primary">модерации</Link>.
         </CardContent>
       </Card>
     </div>

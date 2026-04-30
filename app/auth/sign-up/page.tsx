@@ -7,8 +7,8 @@ export default function SignUpPage() {
   return (
     <AuthCard
       eyebrow="Новый аккаунт"
-      title="Создать Pine профиль"
-      description="После регистрации откроется onboarding, где можно заполнить имя, локацию и аватар."
+      title="Создать профиль Pine"
+      description="После регистрации вы сможете заполнить имя, фото и город."
       footer={
         <>
           Уже есть аккаунт? <Link href="/auth/sign-in" className="font-semibold text-primary">Войти</Link>

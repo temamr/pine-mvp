@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { primaryNavItems } from "@/components/app-shell/nav-items";
+import { getPrimaryNavItems } from "@/components/app-shell/nav-items";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const primaryNavItems = getPrimaryNavItems();
 
   return (
     <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t bg-white/94 px-2 py-2 backdrop-blur md:hidden">

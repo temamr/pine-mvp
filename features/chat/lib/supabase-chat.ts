@@ -217,7 +217,7 @@ export async function sendSupabaseAttachmentNotice(conversationId: ID, label: st
       conversation_id: conversationId,
       sender_id: user.id,
       type: "attachment",
-      text: `${label} добавлено как placeholder-вложение.`,
+      text: `${label} добавлено в переписку.`,
       attachment,
       status: "sent"
     })

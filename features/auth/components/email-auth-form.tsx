@@ -25,7 +25,7 @@ export function EmailAuthForm({ mode }: { mode: EmailAuthMode }) {
     event.preventDefault();
 
     if (!configured) {
-      toast({ title: "Supabase не настроен", description: "Заполните env и перезапустите dev server." });
+      toast({ title: "Вход пока недоступен", description: "Проверьте настройки проекта и перезапустите сайт." });
       return;
     }
 
@@ -45,7 +45,7 @@ export function EmailAuthForm({ mode }: { mode: EmailAuthMode }) {
     setLoading(false);
 
     if (result.error) {
-      toast({ title: "Auth error", description: result.error.message });
+      toast({ title: "Не удалось выполнить вход", description: result.error.message });
       return;
     }
 

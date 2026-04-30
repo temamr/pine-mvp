@@ -46,6 +46,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const [offerAmount, setOfferAmount] = React.useState("");
   const [offerMessage, setOfferMessage] = React.useState("Готов забрать сегодня, если цена подойдет.");
   const [complaintDetails, setComplaintDetails] = React.useState("");
+  const [complaintTargetType, setComplaintTargetType] = React.useState<"listing" | "user">("listing");
   const [remoteListing, setRemoteListing] = React.useState<Listing | null>(null);
   const [remoteSeller, setRemoteSeller] = React.useState<User | null>(null);
   const [remoteSimilar, setRemoteSimilar] = React.useState<Listing[]>([]);
@@ -78,7 +79,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
       .catch((error) => {
         toast({
           title: "Не удалось загрузить объявление",
-          description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+          description: error instanceof Error ? error.message : "Попробуйте еще раз."
         });
       })
       .finally(() => {
@@ -95,7 +96,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   if (remoteLoading) {
     return (
       <Card className="bg-white/92">
-        <CardContent className="p-6 text-sm text-muted-foreground">Загружаю объявление из Supabase...</CardContent>
+        <CardContent className="p-6 text-sm text-muted-foreground">Загружаю объявление...</CardContent>
       </Card>
     );
   }
@@ -136,7 +137,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
         const conversationId = await startSupabaseConversation(currentListing.id);
         router.push(`/chat/${conversationId}`);
       } catch (error) {
-        const description = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+        const description = error instanceof Error ? error.message : "Попробуйте еще раз.";
 
         toast({
           title: "Чат не создан",
@@ -181,7 +182,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
         });
         router.push(`/chat/${conversationId}`);
       } catch (error) {
-        const description = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+        const description = error instanceof Error ? error.message : "Попробуйте еще раз.";
 
         toast({
           title: "Оффер не отправлен",
@@ -216,15 +217,15 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
 
       try {
         await createSupabaseComplaint({
-          targetType: "listing",
-          targetId: currentListing.id,
+          targetType: complaintTargetType,
+          targetId: complaintTargetType === "listing" ? currentListing.id : currentListing.sellerId,
           reason: "other",
           details: complaintDetails
         });
         setComplaintDetails("");
-        toast({ title: "Жалоба отправлена", description: "Trust & Safety увидит обращение в Supabase." });
+        toast({ title: "Жалоба отправлена", description: "Мы проверим обращение." });
       } catch (error) {
-        const description = error instanceof Error ? error.message : "Supabase вернул ошибку.";
+        const description = error instanceof Error ? error.message : "Попробуйте еще раз.";
 
         toast({
           title: "Жалоба не отправлена",
@@ -245,8 +246,8 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
     }
 
     createComplaint({
-      targetType: "listing",
-      targetId: currentListing.id,
+      targetType: complaintTargetType,
+      targetId: complaintTargetType === "listing" ? currentListing.id : currentListing.sellerId,
       reason: "other",
       details: complaintDetails
     });
@@ -279,7 +280,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
     } catch (error) {
       toast({
         title: "Не удалось обновить избранное",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     }
   }
@@ -297,7 +298,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
               <Badge variant="outline" className="bg-white/90">{conditionLabel[listing.condition]}</Badge>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-4">
             {listing.images.map((image, index) => (
               <button
                 key={image.id}
@@ -340,7 +341,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Оффер продавцу</DialogTitle>
-                      <DialogDescription>Цена закрепится в диалоге и продавец сможет принять, отклонить или ответить контр-оффером.</DialogDescription>
+                      <DialogDescription>Предложение появится в диалоге, где продавец сможет принять его, отклонить или ответить встречной ценой.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4">
                       <label className="grid gap-2 text-sm font-medium">
@@ -373,7 +374,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
             <CardContent className="grid gap-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-semibold">{seller?.displayName ?? "Pine seller"}</p>
+                  <p className="font-semibold">{seller?.displayName ?? "Продавец Pine"}</p>
                   <p className="text-sm text-muted-foreground">{seller?.completedDealsCount ?? 0} завершенных сделок</p>
                 </div>
                 <Badge variant="success">
@@ -397,9 +398,20 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
             </SheetTrigger>
             <SheetContent side="bottom">
               <SheetHeader>
-                <SheetTitle>Жалоба на объявление</SheetTitle>
+                <SheetTitle>Жалоба</SheetTitle>
               </SheetHeader>
               <div className="mt-5 grid gap-3">
+                <label className="grid gap-2 text-sm font-medium">
+                  На что жалуетесь
+                  <select
+                    value={complaintTargetType}
+                    onChange={(event) => setComplaintTargetType(event.target.value as "listing" | "user")}
+                    className="h-11 rounded-lg border bg-white px-3 text-sm"
+                  >
+                    <option value="listing">На объявление</option>
+                    <option value="user">На продавца</option>
+                  </select>
+                </label>
                 <Textarea
                   value={complaintDetails}
                   onChange={(event) => setComplaintDetails(event.target.value)}

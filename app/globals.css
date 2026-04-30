@@ -143,6 +143,14 @@ select {
   background-color: hsl(var(--card) / 0.95);
 }
 
+.dark .hover\:bg-white:hover {
+  background-color: hsl(var(--muted));
+}
+
+.dark .hover\:text-foreground:hover {
+  color: hsl(var(--foreground));
+}
+
 .dark .border-white,
 .dark .border-white\/80 {
   border-color: hsl(var(--border));

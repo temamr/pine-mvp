@@ -72,8 +72,8 @@ export function CatalogScreen() {
       })
       .catch((error) => {
         toast({
-          title: "Не удалось загрузить Supabase каталог",
-          description: error instanceof Error ? error.message : "Проверьте env и RLS policies."
+          title: "Не удалось загрузить каталог",
+          description: error instanceof Error ? error.message : "Попробуйте обновить страницу."
         });
       })
       .finally(() => {
@@ -170,8 +170,8 @@ export function CatalogScreen() {
   function handleStartChat(listingId: string) {
     if (supabaseEnabled) {
       toast({
-        title: "Чат подключим на Этапе 6",
-        description: "Объявление уже реальное, realtime conversation будет следующим шагом."
+        title: "Откройте объявление",
+        description: "Из карточки товара можно перейти в диалог с продавцом."
       });
       router.push(`/listings/${listingId}`);
       return;
@@ -208,7 +208,7 @@ export function CatalogScreen() {
     } catch (error) {
       toast({
         title: "Не удалось обновить избранное",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     }
   }

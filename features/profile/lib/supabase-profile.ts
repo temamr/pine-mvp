@@ -42,15 +42,17 @@ export async function fetchSupabaseProfileTrustData(userId: ID): Promise<Supabas
   }
 
   const authoredKeys = new Set(authored.map((item) => `${item.deal_id}:${item.recipient_id}`));
-  const reviewableDeals = deals.map((deal) => {
-    const recipientId = deal.buyer_id === userId ? deal.seller_id : deal.buyer_id;
+  const reviewableDeals = deals
+    .map((deal) => {
+      const recipientId = deal.buyer_id === userId ? deal.seller_id : deal.buyer_id;
 
-    return {
-      ...deal,
-      recipient_id: recipientId,
-      has_review: authoredKeys.has(`${deal.id}:${recipientId}`)
-    };
-  });
+      return {
+        ...deal,
+        recipient_id: recipientId,
+        has_review: authoredKeys.has(`${deal.id}:${recipientId}`)
+      };
+    })
+    .filter((deal) => deal.recipient_id !== userId);
 
   return {
     reviews: reviews.map(mapReview),
@@ -76,6 +78,34 @@ export async function createSupabaseReview(input: {
 
   if (!user) {
     throw new Error("Войдите, чтобы оставить отзыв.");
+  }
+
+  if (input.recipientId === user.id) {
+    throw new Error("Нельзя оставить отзыв самому себе.");
+  }
+
+  const { data: deal, error: dealError } = await client
+    .from("deals")
+    .select("*")
+    .eq("id", input.dealId)
+    .single();
+
+  if (dealError) {
+    throw dealError;
+  }
+
+  if (deal.status !== "completed") {
+    throw new Error("Отзыв можно оставить только после завершенной сделки.");
+  }
+
+  if (deal.buyer_id !== user.id && deal.seller_id !== user.id) {
+    throw new Error("Вы не участвуете в этой сделке.");
+  }
+
+  const expectedRecipientId = deal.buyer_id === user.id ? deal.seller_id : deal.buyer_id;
+
+  if (expectedRecipientId !== input.recipientId) {
+    throw new Error("Отзыв можно оставить только второй стороне сделки.");
   }
 
   const { data, error } = await client

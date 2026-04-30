@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ImagePlus, Loader2, Sparkles, UploadCloud } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Sparkles, UploadCloud } from "lucide-react";
 import type { Category, ListingCondition } from "@/lib/domain";
+import { LocationMapPreview } from "@/components/maps/location-map-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,13 +18,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { listingDraftSchema } from "@/lib/validation/listing.schema";
 import { conditionLabel } from "@/lib/utils/labels";
 
-const steps = ["Категория", "Фото", "Описание", "Цена", "Локация", "Preview"] as const;
+const steps = ["Категория", "Фото", "Описание", "Цена", "Локация", "Проверка"] as const;
 const conditions: ListingCondition[] = ["new", "like_new", "good", "fair", "for_parts"];
-const mockPhotoUrls = [
-  "https://images.unsplash.com/photo-1512790182412-b19e6d62bc39?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80"
-];
 
 type DraftState = {
   categoryId: string;
@@ -53,7 +49,7 @@ export function SellWizardScreen() {
     description: "",
     price: "",
     condition: "good",
-    locationLabel: "Hayes Valley",
+    locationLabel: "Москва",
     imageUrls: []
   });
 
@@ -110,7 +106,8 @@ export function SellWizardScreen() {
   function validate() {
     const parsed = listingDraftSchema.safeParse({
       ...draft,
-      price: draft.price
+      price: draft.price,
+      imageUrls: draft.imageUrls
     });
 
     if (parsed.success) {
@@ -126,11 +123,88 @@ export function SellWizardScreen() {
       }
     });
     setErrors(nextErrors);
+    if (!draft.imageUrls.length) {
+      setErrors((current) => ({ ...current, imageUrls: "Добавьте хотя бы одну фотографию." }));
+    }
     return false;
   }
 
+  function validateStep(targetStep: number) {
+    if (targetStep === 0) {
+      if (!draft.categoryId) {
+        setErrors((current) => ({ ...current, categoryId: "Выберите категорию" }));
+        return false;
+      }
+
+      return true;
+    }
+
+    if (targetStep === 1) {
+      if (!draft.imageUrls.length) {
+        setErrors((current) => ({ ...current, imageUrls: "Добавьте хотя бы одну фотографию." }));
+        return false;
+      }
+
+      return true;
+    }
+
+    if (targetStep === 2) {
+      const parsed = listingDraftSchema.pick({ title: true, description: true }).safeParse(draft);
+
+      if (parsed.success) {
+        return true;
+      }
+
+      const nextErrors: ErrorState = {};
+      parsed.error.issues.forEach((issue) => {
+        const field = issue.path[0];
+        if (typeof field === "string" && field in draft) {
+          nextErrors[field as keyof DraftState] = issue.message;
+        }
+      });
+      setErrors((current) => ({ ...current, ...nextErrors }));
+      return false;
+    }
+
+    if (targetStep === 3) {
+      const parsed = listingDraftSchema.pick({ price: true, condition: true }).safeParse({
+        price: draft.price,
+        condition: draft.condition
+      });
+
+      if (parsed.success) {
+        return true;
+      }
+
+      const nextErrors: ErrorState = {};
+      parsed.error.issues.forEach((issue) => {
+        const field = issue.path[0];
+        if (typeof field === "string" && field in draft) {
+          nextErrors[field as keyof DraftState] = issue.message;
+        }
+      });
+      setErrors((current) => ({ ...current, ...nextErrors }));
+      return false;
+    }
+
+    if (targetStep === 4) {
+      const parsed = listingDraftSchema.pick({ locationLabel: true }).safeParse({
+        locationLabel: draft.locationLabel
+      });
+
+      if (parsed.success) {
+        return true;
+      }
+
+      setErrors((current) => ({ ...current, locationLabel: parsed.error.issues[0]?.message ?? "Укажите локацию" }));
+      return false;
+    }
+
+    return true;
+  }
+
   function nextStep() {
-    if (step >= 2 && !validate()) {
+    if (!validateStep(step)) {
       toast({ title: "Проверьте поля", description: "Подсказки уже отмечены в форме." });
       return;
     }
@@ -166,7 +240,7 @@ export function SellWizardScreen() {
       "description",
       `${draft.title || "Устройство"} в аккуратном состоянии. Подойдет тем, кто ищет надежный ${category} без лишних рисков. Готов показать серийный номер, дополнительные фото, состояние батареи или тесты производительности и договориться через Pine.`
     );
-    toast({ title: "Описание предложено", description: "AI stub заполнил текст, его можно отредактировать." });
+    toast({ title: "Описание предложено", description: "Черновик текста готов, его можно отредактировать." });
   }
 
   async function save(submitToModeration: boolean) {
@@ -190,15 +264,13 @@ export function SellWizardScreen() {
 
         toast({
           title: submitToModeration ? "Отправлено на модерацию" : "Черновик сохранен",
-          description: submitToModeration
-            ? "Запись создана в Supabase и ожидает проверки."
-            : "Черновик создан в Supabase."
+          description: submitToModeration ? "Объявление отправлено на проверку." : "Черновик сохранен."
         });
         router.push(submitToModeration ? "/profile/listings" : `/listings/${listing.id}`);
       } catch (error) {
         toast({
           title: "Не удалось сохранить объявление",
-          description: error instanceof Error ? error.message : "Supabase вернул ошибку."
+          description: error instanceof Error ? error.message : "Попробуйте еще раз."
         });
       } finally {
         setSaving(false);
@@ -283,21 +355,7 @@ export function SellWizardScreen() {
                   <span className="text-sm text-muted-foreground">До 10 изображений, можно менять порядок</span>
                   <input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => handleFiles(event.target.files)} />
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {mockPhotoUrls.map((url, index) => (
-                    <Button
-                      key={url}
-                      variant="outline"
-                      onClick={() => {
-                        update("imageUrls", [...draft.imageUrls, url]);
-                        setImageFiles((current) => [...current, null]);
-                      }}
-                    >
-                      <ImagePlus className="h-4 w-4" />
-                      Mock фото {index + 1}
-                    </Button>
-                  ))}
-                </div>
+                {errors.imageUrls ? <span className="text-xs text-destructive">{errors.imageUrls}</span> : null}
                 <div className="grid gap-3 sm:grid-cols-3">
                   {draft.imageUrls.map((url, index) => (
                     <div key={`${url}-${index}`} className="rounded-lg border bg-background p-2">
@@ -326,7 +384,7 @@ export function SellWizardScreen() {
                 </label>
                 <Button variant="secondary" onClick={generateDescription}>
                   <Sparkles className="h-4 w-4" />
-                  AI generate description
+                  Подсказать описание
                 </Button>
               </div>
             ) : null}
@@ -335,7 +393,17 @@ export function SellWizardScreen() {
               <div className="grid gap-4">
                 <label className="grid gap-2 text-sm font-medium">
                   Цена
-                  <Input value={draft.price} onChange={(event) => update("price", event.target.value)} inputMode="numeric" placeholder="1180" />
+                  <Input
+                    value={draft.price}
+                    onChange={(event) => update("price", event.target.value)}
+                    onBlur={() => {
+                      if (validateStep(3) && Number(draft.price) > 0) {
+                        setStep(4);
+                      }
+                    }}
+                    inputMode="numeric"
+                    placeholder="85000"
+                  />
                   {errors.price ? <span className="text-xs text-destructive">{errors.price}</span> : null}
                 </label>
                 <label className="grid gap-2 text-sm font-medium">
@@ -357,24 +425,23 @@ export function SellWizardScreen() {
               <div className="grid gap-4">
                 <label className="grid gap-2 text-sm font-medium">
                   Локация
-                  <Input value={draft.locationLabel} onChange={(event) => update("locationLabel", event.target.value)} />
+                  <Input
+                    value={draft.locationLabel}
+                    onChange={(event) => update("locationLabel", event.target.value)}
+                    placeholder="Москва, Пресненский район"
+                  />
                   {errors.locationLabel ? <span className="text-xs text-destructive">{errors.locationLabel}</span> : null}
                 </label>
-                <div className="surface-grid flex h-56 items-center justify-center rounded-lg border bg-background">
-                  <div className="rounded-lg bg-white px-4 py-3 text-center shadow-soft">
-                    <p className="font-semibold">{draft.locationLabel}</p>
-                    <p className="text-sm text-muted-foreground">Карта подключится после выбора провайдера</p>
-                  </div>
-                </div>
+                <LocationMapPreview query={draft.locationLabel} />
               </div>
             ) : null}
 
             {step === 5 ? (
               <div className="grid gap-4">
                 <h2 className="text-xl font-bold">{draft.title || "Название объявления"}</h2>
-                <p className="text-2xl font-bold">${Number(draft.price || 0).toLocaleString("en-US")}</p>
+                <p className="text-2xl font-bold">{Number(draft.price || 0).toLocaleString("ru-RU")} ₽</p>
                 <p className="leading-7 text-muted-foreground">{draft.description || "Описание появится здесь."}</p>
-                <Badge className="w-fit" variant="warning">Preview перед модерацией</Badge>
+                <Badge className="w-fit" variant="warning">Проверьте карточку перед отправкой</Badge>
               </div>
             ) : null}
           </CardContent>
@@ -388,7 +455,7 @@ export function SellWizardScreen() {
             <p>Добавьте 2-4 фото с разными ракурсами.</p>
             <p>Укажите состояние честно: это снижает жалобы после встречи.</p>
             <p>Цена около рыночной чаще приводит к первому сообщению в течение дня.</p>
-            <p>{supabaseEnabled ? "Черновик сохраняется в Supabase со статусом draft." : "Черновик сохраняется локально как mock listing."}</p>
+            <p>Покажите серийный номер, комплект и следы использования на фото.</p>
           </CardContent>
         </Card>
       </div>
@@ -401,12 +468,12 @@ export function SellWizardScreen() {
         <div className="hidden md:block" />
         <Button variant="outline" disabled={saving} onClick={() => void save(false)}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Save draft
+          Сохранить черновик
         </Button>
         {step === steps.length - 1 ? (
           <Button disabled={saving} onClick={() => void save(true)}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Submit to moderation
+            Отправить на модерацию
           </Button>
         ) : (
           <Button onClick={nextStep}>

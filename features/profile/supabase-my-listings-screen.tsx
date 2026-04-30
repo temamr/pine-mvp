@@ -18,11 +18,11 @@ import { listingStatusLabel } from "@/lib/utils/labels";
 
 const groups: Array<{ value: Listing["status"] | "all"; label: string }> = [
   { value: "all", label: "Все" },
-  { value: "draft", label: "Draft" },
-  { value: "pending", label: "Pending" },
-  { value: "published", label: "Published" },
-  { value: "needs_changes", label: "Needs changes" },
-  { value: "sold", label: "Sold" }
+  { value: "draft", label: "Черновики" },
+  { value: "pending", label: "На модерации" },
+  { value: "published", label: "Опубликованные" },
+  { value: "needs_changes", label: "Нужны правки" },
+  { value: "sold", label: "Проданные" }
 ];
 
 export function SupabaseMyListingsScreen() {
@@ -98,7 +98,7 @@ export function SupabaseMyListingsScreen() {
       return;
     }
 
-    toast({ title: "Статус обновлен", description: "Объявление отмечено как sold." });
+    toast({ title: "Статус обновлен", description: "Объявление отмечено как проданное." });
     await reload();
   }
 
@@ -138,7 +138,7 @@ export function SupabaseMyListingsScreen() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Данные загружаются из Supabase listings и listing_images.</p>
+          <p className="text-sm text-muted-foreground">Следите за статусом публикации, правками после проверки и продажами.</p>
         </CardContent>
       </Card>
 

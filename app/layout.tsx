@@ -5,8 +5,8 @@ import { ToasterProvider } from "@/components/ui/toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pine Marketplace",
-  description: "Mobile-first marketplace foundation for buying, selling, chatting and closing deals."
+  title: "Pine",
+  description: "Pine — площадка для покупки и продажи электроники с объявлениями, чатом и сделками."
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
