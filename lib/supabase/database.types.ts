@@ -256,6 +256,13 @@ export type Database = {
         Args: { p_offer_id: UUID };
         Returns: Database["public"]["Tables"]["offers"]["Row"];
       };
+      accept_offer_and_create_deal: {
+        Args: {
+          p_offer_id: UUID;
+          p_type?: Database["public"]["Enums"]["deal_type"];
+        };
+        Returns: Database["public"]["Tables"]["offers"]["Row"];
+      };
       decline_offer: {
         Args: { p_offer_id: UUID };
         Returns: Database["public"]["Tables"]["offers"]["Row"];
@@ -301,6 +308,18 @@ export type Database = {
         Args: {
           p_conversation_id: UUID;
           p_type: Database["public"]["Enums"]["deal_type"];
+        };
+        Returns: Database["public"]["Tables"]["deals"]["Row"];
+      };
+      mark_deal_shipped_by_seller: {
+        Args: {
+          p_conversation_id: UUID;
+        };
+        Returns: Database["public"]["Tables"]["deals"]["Row"];
+      };
+      confirm_deal_completed_by_buyer: {
+        Args: {
+          p_conversation_id: UUID;
         };
         Returns: Database["public"]["Tables"]["deals"]["Row"];
       };

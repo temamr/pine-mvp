@@ -2,15 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2, PackageCheck, ShieldCheck, Truck } from "lucide-react";
-import type { Deal, DealStatus, ID } from "@/lib/domain";
+import { Loader2, PackageCheck, ShieldCheck } from "lucide-react";
+import type { Deal } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import {
-  advanceSupabaseDeal,
   fetchSupabaseDealsData,
   subscribeToSupabaseDeals,
   type SupabaseDealsData
@@ -18,17 +17,16 @@ import {
 import { formatMoney, formatRelativeDate } from "@/lib/utils/format";
 import { dealStatusLabel, dealTypeLabel } from "@/lib/utils/labels";
 
-const nextStatuses: DealStatus[] = ["payment_pending", "reserved", "handoff_planned", "in_transit", "inspection", "completed"];
-
 export function SupabaseDealsScreen() {
   const { toast } = useToast();
   const [data, setData] = React.useState<SupabaseDealsData>({
     userId: null,
+    role: null,
+    isStaff: false,
     deals: [],
     listingsById: {}
   });
   const [loading, setLoading] = React.useState(true);
-  const [busyDeal, setBusyDeal] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -61,30 +59,6 @@ export function SupabaseDealsScreen() {
       }));
     });
   }, [data.userId]);
-
-  async function advance(dealId: ID, status: DealStatus) {
-    setBusyDeal(`${dealId}:${status}`);
-
-    try {
-      const deal = await advanceSupabaseDeal(dealId, status);
-      setData((current) => ({
-        ...current,
-        deals: upsertDeal(current.deals, deal)
-      }));
-      toast({
-        title: "Статус обновлен",
-        description: status === "completed" ? "Товар помечен как продан, сделка закрыта." : dealStatusLabel[status]
-      });
-      void load();
-    } catch (error) {
-      toast({
-        title: "Статус не обновлен",
-        description: error instanceof Error ? error.message : "Supabase вернул ошибку."
-      });
-    } finally {
-      setBusyDeal(null);
-    }
-  }
 
   if (loading) {
     return (
@@ -131,10 +105,10 @@ export function SupabaseDealsScreen() {
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm text-muted-foreground">
-          <p>Здесь можно следить за этапами передачи товара, доставки и завершения сделки.</p>
+          <p>Здесь можно следить за ходом сделки и быстро возвращаться в чат.</p>
           <p className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            Все ключевые этапы фиксируются в истории сделки.
+            Все ключевые этапы фиксируются в истории, а действия сторон выполняются прямо из чата.
           </p>
         </CardContent>
       </Card>
@@ -147,14 +121,23 @@ export function SupabaseDealsScreen() {
             <Card key={deal.id} className="bg-card/94">
               <CardContent className="grid gap-5 p-5 lg:grid-cols-[1fr_0.8fr]">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={deal.status === "completed" ? "success" : deal.status === "cancelled" ? "danger" : "accent"}>
-                      {dealStatusLabel[deal.status]}
-                    </Badge>
-                    <Badge variant="outline" className="bg-background">{dealTypeLabel[deal.type]}</Badge>
-                  </div>
+                  {data.isStaff ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={deal.status === "completed" ? "success" : deal.status === "cancelled" ? "danger" : "accent"}>
+                        {dealStatusLabel[deal.status]}
+                      </Badge>
+                      <Badge variant="outline" className="bg-background">{dealTypeLabel[deal.type]}</Badge>
+                    </div>
+                  ) : null}
                   <h2 className="mt-3 text-xl font-bold">{listing?.title ?? "Сделка Pine"}</h2>
                   <p className="mt-1 text-2xl font-bold">{formatMoney(deal.amount)}</p>
+                  {!data.isStaff ? (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {deal.status === "completed"
+                        ? "Сделка завершена. Если все прошло хорошо, можно оставить отзыв."
+                        : "Следите за обновлениями в чате: продавец подтверждает отправку, покупатель подтверждает завершение."}
+                    </p>
+                  ) : null}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/chat/${deal.conversationId}`}>Открыть чат</Link>
@@ -168,31 +151,9 @@ export function SupabaseDealsScreen() {
                       </Button>
                     ) : null}
                   </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    {nextStatuses.map((status) => (
-                      <Button
-                        key={status}
-                        variant={status === deal.status ? "secondary" : "outline"}
-                        size="sm"
-                        disabled={busyDeal === `${deal.id}:${status}` || deal.status === "completed" || deal.status === "cancelled"}
-                        onClick={() => advance(deal.id, status)}
-                      >
-                        {status === "completed" ? <CheckCircle2 className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
-                        {dealStatusLabel[status]}
-                      </Button>
-                    ))}
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      disabled={busyDeal === `${deal.id}:cancelled` || deal.status === "completed" || deal.status === "cancelled"}
-                      onClick={() => advance(deal.id, "cancelled")}
-                    >
-                      Отменить
-                    </Button>
-                  </div>
                 </div>
                 <div className="grid content-start gap-3">
-                  <p className="font-semibold">История</p>
+                  <p className="font-semibold">{data.isStaff ? "История и статусы" : "История"}</p>
                   {deal.timeline.map((event) => (
                     <div key={event.id} className="rounded-lg border bg-background p-3">
                       <p className="font-semibold">{event.label}</p>

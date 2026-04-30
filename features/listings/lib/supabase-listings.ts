@@ -20,10 +20,12 @@ export type SupabaseListingDraft = {
 };
 
 export type ListingDetailsData = {
+  userId: ID | null;
   listing: Listing;
   seller: User | null;
   similar: Listing[];
   isFavorite: boolean;
+  favoriteCount: number;
 };
 
 export function getSupabaseListingsClient() {
@@ -76,8 +78,18 @@ export async function fetchSupabaseListingDetails(listingId: ID): Promise<Listin
     repositories.listings.list({ categoryId: listing.categoryId, sort: "newest" }),
     user ? fetchFavoriteIds(client, user.id) : Promise.resolve(new Set<string>())
   ]);
+  const { count: favoriteCount, error: favoriteCountError } = await client
+    .from("favorites")
+    .select("*", { count: "exact", head: true })
+    .eq("listing_id", listing.id)
+    .is("archived_at", null);
+
+  if (favoriteCountError) {
+    throw favoriteCountError;
+  }
 
   return {
+    userId: user?.id ?? null,
     listing: {
       ...listing,
       isFavorite: favoriteIds.has(listing.id)
@@ -87,7 +99,8 @@ export async function fetchSupabaseListingDetails(listingId: ID): Promise<Listin
       .filter((item) => item.id !== listing.id)
       .slice(0, 3)
       .map((item) => ({ ...item, isFavorite: favoriteIds.has(item.id) })),
-    isFavorite: favoriteIds.has(listing.id)
+    isFavorite: favoriteIds.has(listing.id),
+    favoriteCount: favoriteCount ?? 0
   };
 }
 

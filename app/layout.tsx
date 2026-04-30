@@ -6,7 +6,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Pine",
-  description: "Pine — площадка для покупки и продажи электроники с объявлениями, чатом и сделками."
+  description: "Pine — площадка для покупки и продажи электроники с объявлениями, чатом и сделками.",
+  icons: {
+    icon: "/icon"
+  }
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

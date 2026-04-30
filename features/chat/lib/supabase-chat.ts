@@ -1,9 +1,10 @@
 "use client";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Conversation, ID, Listing, Message, Offer } from "@/lib/domain";
+import type { Conversation, Deal, ID, Listing, Message, Offer } from "@/lib/domain";
 import {
   mapConversation,
+  mapDeal,
   mapListing,
   mapMessage,
   mapOffer,
@@ -56,11 +57,12 @@ export async function loadSupabaseConversations(): Promise<ConversationBundle> {
 
 export async function loadSupabaseThread(conversationId: ID) {
   const client = createSupabaseBrowserClient();
-  const [{ data: conversation, error: conversationError }, { data: messages, error: messagesError }, { data: offers, error: offersError }] =
+  const [{ data: conversation, error: conversationError }, { data: messages, error: messagesError }, { data: offers, error: offersError }, { data: dealRow, error: dealError }] =
     await Promise.all([
       client.from("conversations").select("*").eq("id", conversationId).maybeSingle(),
       client.from("messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true }),
-      client.from("offers").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: false })
+      client.from("offers").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: false }),
+      client.from("deals").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(1).maybeSingle()
     ]);
 
   if (conversationError) {
@@ -75,12 +77,17 @@ export async function loadSupabaseThread(conversationId: ID) {
     throw offersError;
   }
 
+  if (dealError) {
+    throw dealError;
+  }
+
   const listing = conversation
     ? (await loadListingsById(client, [conversation.listing_id]))[conversation.listing_id] ?? null
     : null;
 
   return {
     conversation: conversation ? mapConversation(conversation) : null,
+    deal: dealRow ? mapDeal(dealRow) : null,
     listing,
     messages: messages.map(mapMessage),
     offers: offers.map(mapOffer)
@@ -190,7 +197,7 @@ export async function sendSupabaseMessage(conversationId: ID, text: string): Pro
   return mapMessage(data);
 }
 
-export async function sendSupabaseAttachmentNotice(conversationId: ID, label: string): Promise<Message> {
+export async function sendSupabaseImageAttachment(conversationId: ID, file: File): Promise<Message> {
   const client = createSupabaseBrowserClient();
   const {
     data: { user },
@@ -205,10 +212,22 @@ export async function sendSupabaseAttachmentNotice(conversationId: ID, label: st
     throw new Error("Войдите, чтобы отправить вложение.");
   }
 
+  const extension = file.name.split(".").pop() ?? "jpg";
+  const path = `chat-media/${conversationId}/${Date.now()}.${extension}`;
+  const { error: uploadError } = await client.storage.from("listing-images").upload(path, file, {
+    contentType: file.type,
+    upsert: true
+  });
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const { data: publicUrl } = client.storage.from("listing-images").getPublicUrl(path);
   const attachment: Json = {
     type: "image",
-    url: "",
-    alt: label
+    url: publicUrl.publicUrl,
+    alt: file.name || "Фото из чата"
   };
 
   const { data, error } = await client
@@ -217,7 +236,7 @@ export async function sendSupabaseAttachmentNotice(conversationId: ID, label: st
       conversation_id: conversationId,
       sender_id: user.id,
       type: "attachment",
-      text: `${label} добавлено в переписку.`,
+      text: "Фото добавлено в переписку.",
       attachment,
       status: "sent"
     })
@@ -263,7 +282,7 @@ export async function createSupabaseOffer(conversation: Conversation, amount: nu
       buyer_id: conversation.buyerId,
       seller_id: conversation.sellerId,
       amount,
-      currency: "USD",
+      currency: "RUB",
       status: "sent",
       message
     })
@@ -274,14 +293,17 @@ export async function createSupabaseOffer(conversation: Conversation, amount: nu
     throw error;
   }
 
-  await insertSystemMessage(client, conversation.id, `Оффер на ${amount} USD отправлен продавцу.`);
+  await insertSystemMessage(client, conversation.id, `Оффер на ${amount} руб. отправлен продавцу.`);
 
   return mapOffer(data);
 }
 
 export async function acceptSupabaseOffer(offerId: ID): Promise<Offer> {
   const client = createSupabaseBrowserClient();
-  const { data, error } = await client.rpc("accept_offer", { p_offer_id: offerId });
+  const { data, error } = await client.rpc("accept_offer_and_create_deal", {
+    p_offer_id: offerId,
+    p_type: "courier"
+  });
 
   if (error) {
     throw error;
@@ -319,11 +341,38 @@ export async function counterSupabaseOffer(offerId: ID, conversationId: ID): Pro
   return mapOffer(data);
 }
 
+export async function markSupabaseDealShipped(conversationId: ID): Promise<Deal> {
+  const client = createSupabaseBrowserClient();
+  const { data, error } = await client.rpc("mark_deal_shipped_by_seller", {
+    p_conversation_id: conversationId
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapDeal(data);
+}
+
+export async function confirmSupabaseDealCompleted(conversationId: ID): Promise<Deal> {
+  const client = createSupabaseBrowserClient();
+  const { data, error } = await client.rpc("confirm_deal_completed_by_buyer", {
+    p_conversation_id: conversationId
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapDeal(data);
+}
+
 export function subscribeToSupabaseThread(
   conversationId: ID,
   handlers: {
     onMessage: (message: Message) => void;
     onOfferChange: (offer: Offer) => void;
+    onDealChange: (deal: Deal) => void;
   }
 ) {
   const client = createSupabaseBrowserClient();
@@ -352,6 +401,18 @@ export function subscribeToSupabaseThread(
       },
       (payload) => {
         handlers.onOfferChange(mapOffer(payload.new as Tables<"offers">));
+      }
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "deals",
+        filter: `conversation_id=eq.${conversationId}`
+      },
+      (payload) => {
+        handlers.onDealChange(mapDeal(payload.new as Tables<"deals">));
       }
     )
     .subscribe();

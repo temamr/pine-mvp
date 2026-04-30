@@ -4,7 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Flag, Heart, ImageOff, MapPin, MessageCircle, ShieldCheck, Star, Tag } from "lucide-react";
+import { BarChart3, Flag, Heart, ImageOff, MapPin, MessageCircle, Pencil, ShieldCheck, Star, Tag } from "lucide-react";
 import type { Listing, User } from "@/lib/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { createSupabaseOffer, loadSupabaseThread, startSupabaseConversation } fr
 import { ListingCard } from "@/features/listings/components/listing-card";
 import { fetchSupabaseListingDetails, toggleSupabaseFavorite } from "@/features/listings/lib/supabase-listings";
 import { createSupabaseComplaint } from "@/features/moderation/lib/supabase-moderation";
+import { useSupabaseSession } from "@/features/auth/components/use-supabase-session";
 import { usePineStore, demoUsers } from "@/lib/mock/use-pine-store";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { STATUS_TONE } from "@/lib/theme";
@@ -42,6 +43,8 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const startConversation = usePineStore((state) => state.startConversation);
   const createOffer = usePineStore((state) => state.createOffer);
   const createComplaint = usePineStore((state) => state.createComplaint);
+  const currentUserId = usePineStore((state) => state.currentUserId);
+  const { user } = useSupabaseSession();
   const [imageIndex, setImageIndex] = React.useState(0);
   const [offerAmount, setOfferAmount] = React.useState("");
   const [offerMessage, setOfferMessage] = React.useState("Готов забрать сегодня, если цена подойдет.");
@@ -50,6 +53,8 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const [remoteListing, setRemoteListing] = React.useState<Listing | null>(null);
   const [remoteSeller, setRemoteSeller] = React.useState<User | null>(null);
   const [remoteSimilar, setRemoteSimilar] = React.useState<Listing[]>([]);
+  const [favoriteCount, setFavoriteCount] = React.useState(0);
+  const [viewerId, setViewerId] = React.useState<string | null>(user?.id ?? null);
   const [remoteLoading, setRemoteLoading] = React.useState(supabaseEnabled);
   const mockListing = listings.find((item) => item.id === listingId);
   const listing = supabaseEnabled ? remoteListing : mockListing;
@@ -71,8 +76,10 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
         setRemoteListing(data?.listing ?? null);
         setRemoteSeller(data?.seller ?? null);
         setRemoteSimilar(data?.similar ?? []);
+        setFavoriteCount(data?.favoriteCount ?? 0);
+        setViewerId(data?.userId ?? null);
 
-        if (data?.listing) {
+        if (data?.listing && data.userId !== data.listing.sellerId) {
           void trackSupabaseListingView(data.listing.id);
         }
       })
@@ -120,6 +127,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const seller = supabaseEnabled
     ? remoteSeller
     : demoUsers.find((user) => user.id === currentListing.sellerId);
+  const isOwnListing = supabaseEnabled ? viewerId === currentListing.sellerId : currentUserId === currentListing.sellerId;
   const activeImage = currentListing.images[imageIndex] ?? currentListing.images[0];
   const lowball = Number(offerAmount) > 0 && Number(offerAmount) < currentListing.price.amount * 0.75;
   const similarListings = supabaseEnabled
@@ -272,6 +280,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
       setRemoteListing((current) =>
         current?.id === listingIdToToggle ? { ...current, isFavorite: result.isFavorite } : current
       );
+      setFavoriteCount((current) => Math.max(0, current + (result.isFavorite ? 1 : -1)));
       setRemoteSimilar((current) =>
         current.map((item) =>
           item.id === listingIdToToggle ? { ...item, isFavorite: result.isFavorite } : item
@@ -326,51 +335,78 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                   <CardTitle className="text-2xl leading-tight">{listing.title}</CardTitle>
                   <p className="mt-2 text-sm text-muted-foreground">{formatRelativeDate(listing.createdAt)}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => handleFavorite(listing.id)} aria-label="В избранное">
-                  <Heart className={listing.isFavorite ? "h-5 w-5 fill-red-500 text-red-500" : "h-5 w-5"} />
-                </Button>
+                {!isOwnListing ? (
+                  <Button variant="ghost" size="icon" onClick={() => handleFavorite(listing.id)} aria-label="В избранное">
+                    <Heart className={listing.isFavorite ? "h-5 w-5 fill-red-500 text-red-500" : "h-5 w-5"} />
+                  </Button>
+                ) : null}
               </div>
             </CardHeader>
             <CardContent className="grid gap-4">
               <p className="text-3xl font-bold">{formatMoney(listing.price)}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button onClick={handleStartChat}>
-                  <MessageCircle className="h-4 w-4" />
-                  Написать
-                </Button>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="secondary">
-                      <Tag className="h-4 w-4" />
-                      Предложить цену
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Оффер продавцу</DialogTitle>
-                      <DialogDescription>Предложение появится в диалоге, где продавец сможет принять его, отклонить или ответить встречной ценой.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4">
-                      <label className="grid gap-2 text-sm font-medium">
-                        Ваша цена
-                        <Input value={offerAmount} onChange={(event) => setOfferAmount(event.target.value)} inputMode="numeric" placeholder={`${listing.price.amount - 50}`} />
-                      </label>
-                      {lowball ? (
-                        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-                          Предложение заметно ниже цены. Мягкий старт часто повышает шанс ответа.
-                        </div>
-                      ) : null}
-                      <label className="grid gap-2 text-sm font-medium">
-                        Сообщение
-                        <Textarea value={offerMessage} onChange={(event) => setOfferMessage(event.target.value)} />
-                      </label>
+              {isOwnListing ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border bg-background p-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      Просмотры
                     </div>
-                    <DialogFooter>
-                      <Button onClick={handleOffer}>Отправить оффер</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                    <p className="mt-2 text-2xl font-bold">{listing.viewsCount}</p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Heart className="h-4 w-4 text-primary" />
+                      В избранном
+                    </div>
+                    <p className="mt-2 text-2xl font-bold">{favoriteCount}</p>
+                  </div>
+                  <Button asChild className="sm:col-span-2">
+                    <Link href="/profile/listings">
+                      <Pencil className="h-4 w-4" />
+                      Редактировать объявление
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button onClick={handleStartChat}>
+                    <MessageCircle className="h-4 w-4" />
+                    Написать
+                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="secondary">
+                        <Tag className="h-4 w-4" />
+                        Предложить цену
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Оффер продавцу</DialogTitle>
+                        <DialogDescription>Предложение появится в диалоге, где продавец сможет принять его, отклонить или ответить встречной ценой.</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4">
+                        <label className="grid gap-2 text-sm font-medium">
+                          Ваша цена
+                          <Input value={offerAmount} onChange={(event) => setOfferAmount(event.target.value)} inputMode="numeric" placeholder={`${listing.price.amount - 50}`} />
+                        </label>
+                        {lowball ? (
+                          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+                            Предложение заметно ниже цены. Мягкий старт часто повышает шанс ответа.
+                          </div>
+                        ) : null}
+                        <label className="grid gap-2 text-sm font-medium">
+                          Сообщение
+                          <Textarea value={offerMessage} onChange={(event) => setOfferMessage(event.target.value)} />
+                        </label>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={handleOffer}>Отправить оффер</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -396,40 +432,42 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
             </CardContent>
           </Card>
 
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline">
-                <Flag className="h-4 w-4" />
-                Пожаловаться
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom">
-              <SheetHeader>
-                <SheetTitle>Жалоба</SheetTitle>
-              </SheetHeader>
-              <div className="mt-5 grid gap-3">
-                <label className="grid gap-2 text-sm font-medium">
-                  На что жалуетесь
-                  <select
-                    value={complaintTargetType}
-                    onChange={(event) => setComplaintTargetType(event.target.value as "listing" | "user")}
-                    className="h-11 rounded-lg border bg-background px-3 text-sm"
-                  >
-                    <option value="listing">На объявление</option>
-                    <option value="user">На продавца</option>
-                  </select>
-                </label>
-                <Textarea
-                  value={complaintDetails}
-                  onChange={(event) => setComplaintDetails(event.target.value)}
-                  placeholder="Что стоит проверить модерации?"
-                />
-              </div>
-              <SheetFooter>
-                <Button onClick={handleComplaint}>Отправить</Button>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
+          {!isOwnListing ? (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline">
+                  <Flag className="h-4 w-4" />
+                  Пожаловаться
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom">
+                <SheetHeader>
+                  <SheetTitle>Жалоба</SheetTitle>
+                </SheetHeader>
+                <div className="mt-5 grid gap-3">
+                  <label className="grid gap-2 text-sm font-medium">
+                    На что жалуетесь
+                    <select
+                      value={complaintTargetType}
+                      onChange={(event) => setComplaintTargetType(event.target.value as "listing" | "user")}
+                      className="h-11 rounded-lg border bg-background px-3 text-sm"
+                    >
+                      <option value="listing">На объявление</option>
+                      <option value="user">На продавца</option>
+                    </select>
+                  </label>
+                  <Textarea
+                    value={complaintDetails}
+                    onChange={(event) => setComplaintDetails(event.target.value)}
+                    placeholder="Что стоит проверить модерации?"
+                  />
+                </div>
+                <SheetFooter>
+                  <Button onClick={handleComplaint}>Отправить</Button>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+          ) : null}
         </aside>
       </div>
 

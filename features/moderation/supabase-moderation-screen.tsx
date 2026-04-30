@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Flag, Loader2, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import type { Complaint, ID, ModerationCase } from "@/lib/domain";
@@ -50,6 +51,8 @@ export function SupabaseModerationScreen() {
   const [reason, setReason] = React.useState<Complaint["reason"]>("other");
   const [details, setDetails] = React.useState("");
   const [moderationNotes, setModerationNotes] = React.useState<Record<ID, string>>({});
+  const [expandedComplaintId, setExpandedComplaintId] = React.useState<ID | null>(null);
+  const [expandedCaseId, setExpandedCaseId] = React.useState<ID | null>(null);
   const [trustUserId, setTrustUserId] = React.useState("");
   const [blockReason, setBlockReason] = React.useState("Повторное нарушение правил площадки.");
   const [verificationStatus, setVerificationStatus] = React.useState<Database["public"]["Enums"]["verification_status"]>("trusted");
@@ -261,6 +264,8 @@ export function SupabaseModerationScreen() {
                 const reporter = currentData.usersById[complaint.reporterId];
                 const targetUserId = complaint.targetType === "user" ? complaint.targetId : targetListing?.sellerId;
                 const targetUser = targetUserId ? currentData.usersById[targetUserId] : null;
+                const sellerListings = targetUserId ? currentData.listingsBySellerId[targetUserId] ?? [] : [];
+                const expanded = expandedComplaintId === complaint.id;
 
                 return (
                   <Card key={complaint.id} className="bg-card/92">
@@ -290,6 +295,65 @@ export function SupabaseModerationScreen() {
                           </Button>
                         ) : null}
                       </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setExpandedComplaintId(expanded ? null : complaint.id)}>
+                          {expanded ? "Скрыть детали" : "Подробнее"}
+                        </Button>
+                      </div>
+                      {expanded ? (
+                        <div className="grid gap-4 rounded-lg border bg-background p-4 lg:grid-cols-[1.15fr_0.85fr]">
+                          <div className="grid gap-4">
+                            {targetListing ? (
+                              <>
+                                <div className="grid gap-3">
+                                  <p className="text-sm font-semibold">Объявление</p>
+                                  {targetListing.images[0] ? (
+                                    <div className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-muted">
+                                      <Image src={targetListing.images[0].url} alt={targetListing.images[0].alt} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 40vw" />
+                                    </div>
+                                  ) : null}
+                                  <div className="grid gap-2 text-sm">
+                                    <p className="font-semibold">{targetListing.title}</p>
+                                    <p className="text-muted-foreground">{targetListing.description}</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Badge variant={STATUS_TONE[targetListing.status]}>{listingStatusLabel[targetListing.status]}</Badge>
+                                      <Badge variant="outline" className="bg-background">{targetListing.viewsCount} просмотров</Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Для этой жалобы нет связанного объявления.</p>
+                            )}
+                          </div>
+                          <div className="grid gap-4">
+                            <div className="grid gap-2 text-sm">
+                              <p className="font-semibold">Профиль продавца</p>
+                              <p>{targetUser?.displayName ?? "Пользователь не найден"}</p>
+                              <p className="text-muted-foreground">
+                                Рейтинг: {targetUser?.rating ?? 0} · отзывов: {targetUser?.reviewsCount ?? 0} · сделок: {targetUser?.completedDealsCount ?? 0}
+                              </p>
+                              <p className="text-muted-foreground">Роль: {targetUser?.role ?? "unknown"}</p>
+                            </div>
+                            {sellerListings.length ? (
+                              <div className="grid gap-2 text-sm">
+                                <p className="font-semibold">Другие объявления продавца</p>
+                                <div className="grid gap-2">
+                                  {sellerListings.slice(0, 4).map((listing) => (
+                                    <div key={listing.id} className="rounded-lg border p-3">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-medium">{listing.title}</span>
+                                        <Badge variant={STATUS_TONE[listing.status]}>{listingStatusLabel[listing.status]}</Badge>
+                                      </div>
+                                      <p className="mt-1 text-muted-foreground">{listing.location.label}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
                       {currentData.isStaff ? (
                         <div className="flex flex-wrap gap-2 rounded-lg border bg-background p-3">
                           <Button size="sm" variant="outline" disabled={busyAction === `${complaint.id}:reviewing`} onClick={() => updateComplaint(complaint, "reviewing")}>
@@ -335,6 +399,8 @@ export function SupabaseModerationScreen() {
               {currentData.cases.length ? (
                 currentData.cases.map((item) => {
                   const listing = currentData.listingsById[item.listingId];
+                  const seller = listing ? currentData.usersById[listing.sellerId] : null;
+                  const expanded = expandedCaseId === item.id;
                   return (
                     <Card key={item.id} className="bg-card/92">
                       <CardContent className="grid gap-4 p-4">
@@ -353,6 +419,48 @@ export function SupabaseModerationScreen() {
                             <Link href={`/listings/${item.listingId}`}>Открыть</Link>
                           </Button>
                         </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setExpandedCaseId(expanded ? null : item.id)}>
+                            {expanded ? "Скрыть детали" : "Подробнее"}
+                          </Button>
+                        </div>
+                        {expanded && listing ? (
+                          <div className="grid gap-4 rounded-lg border bg-background p-4 lg:grid-cols-[1.15fr_0.85fr]">
+                            <div className="grid gap-3">
+                              {listing.images[0] ? (
+                                <div className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-muted">
+                                  <Image src={listing.images[0].url} alt={listing.images[0].alt} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 40vw" />
+                                </div>
+                              ) : null}
+                              <p className="font-semibold">{listing.title}</p>
+                              <p className="text-sm text-muted-foreground">{listing.description}</p>
+                            </div>
+                            <div className="grid gap-3 text-sm">
+                              <p className="font-semibold">Детали объявления</p>
+                              <div className="rounded-lg border p-3">
+                                <p>Продавец: {seller?.displayName ?? listing.sellerId}</p>
+                                <p className="text-muted-foreground">Рейтинг: {seller?.rating ?? 0} · отзывов: {seller?.reviewsCount ?? 0}</p>
+                              </div>
+                              <div className="rounded-lg border p-3">
+                                <p>Локация: {listing.location.label}</p>
+                                <p>Просмотры: {listing.viewsCount}</p>
+                                <p>Статус: {listingStatusLabel[listing.status]}</p>
+                              </div>
+                              {listing.attributes.length ? (
+                                <div className="rounded-lg border p-3">
+                                  <p className="mb-2 font-semibold">Характеристики</p>
+                                  <div className="grid gap-1">
+                                    {listing.attributes.slice(0, 6).map((attribute) => (
+                                      <p key={attribute.label} className="text-muted-foreground">
+                                        {attribute.label}: {attribute.value}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="grid gap-3 rounded-lg border bg-background p-3">
                           <label className="grid gap-2 text-sm font-medium">
                             Комментарий модератора

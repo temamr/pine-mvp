@@ -11,6 +11,8 @@ import type { Tables } from "@/lib/supabase/database.types";
 
 export type SupabaseDealsData = {
   userId: ID | null;
+  role: Tables<"profiles">["role"] | null;
+  isStaff: boolean;
   deals: Deal[];
   listingsById: Record<ID, Listing>;
 };
@@ -29,9 +31,21 @@ export async function fetchSupabaseDealsData(): Promise<SupabaseDealsData> {
   if (!user) {
     return {
       userId: null,
+      role: null,
+      isStaff: false,
       deals: [],
       listingsById: {}
     };
+  }
+
+  const { data: profile, error: profileError } = await client
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw profileError;
   }
 
   const { data, error } = await client
@@ -49,37 +63,11 @@ export async function fetchSupabaseDealsData(): Promise<SupabaseDealsData> {
 
   return {
     userId: user.id,
+    role: profile?.role ?? null,
+    isStaff: profile?.role === "admin" || profile?.role === "moderator",
     deals,
     listingsById
   };
-}
-
-export async function createSupabaseSafeDeal(conversationId: ID, type: DealType): Promise<Deal> {
-  const client = createSupabaseBrowserClient();
-  const { data, error } = await client.rpc("create_safe_deal", {
-    p_conversation_id: conversationId,
-    p_type: type
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return mapDeal(data);
-}
-
-export async function advanceSupabaseDeal(dealId: ID, status: DealStatus): Promise<Deal> {
-  const client = createSupabaseBrowserClient();
-  const { data, error } = await client.rpc("advance_deal", {
-    p_deal_id: dealId,
-    p_status: status
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return mapDeal(data);
 }
 
 export function subscribeToSupabaseDeals(userId: ID, onChange: (deal: Deal) => void) {

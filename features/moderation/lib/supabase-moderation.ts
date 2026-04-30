@@ -20,6 +20,7 @@ export type SupabaseModerationData = {
   complaints: Complaint[];
   listingsById: Record<ID, Listing>;
   usersById: Record<ID, User>;
+  listingsBySellerId: Record<ID, Listing[]>;
 };
 
 export async function fetchSupabaseModerationData(): Promise<SupabaseModerationData> {
@@ -81,6 +82,13 @@ export async function fetchSupabaseModerationData(): Promise<SupabaseModerationD
   const listingsById = await loadListingsById([...new Set(listingIds)]);
   const userIds = new Set<ID>([...complaints.map((item) => item.reporterId)]);
 
+  cases.forEach((caseItem) => {
+    const listing = listingsById[caseItem.listingId];
+    if (listing) {
+      userIds.add(listing.sellerId);
+    }
+  });
+
   complaints.forEach((complaint) => {
     if (complaint.targetType === "user") {
       userIds.add(complaint.targetId);
@@ -95,6 +103,7 @@ export async function fetchSupabaseModerationData(): Promise<SupabaseModerationD
   });
 
   const usersById = await loadUsersById([...userIds]);
+  const listingsBySellerId = groupListingsBySeller(listingsById);
 
   return {
     userId: user.id,
@@ -104,7 +113,8 @@ export async function fetchSupabaseModerationData(): Promise<SupabaseModerationD
     cases,
     complaints,
     listingsById,
-    usersById
+    usersById,
+    listingsBySellerId
   };
 }
 
@@ -251,6 +261,15 @@ async function loadUsersById(userIds: ID[]) {
   return Object.fromEntries(data.map((profile) => [profile.id, mapProfileToUser(profile)]));
 }
 
+function groupListingsBySeller(listingsById: Record<ID, Listing>) {
+  return Object.values(listingsById).reduce<Record<ID, Listing[]>>((acc, listing) => {
+    acc[listing.sellerId] = [...(acc[listing.sellerId] ?? []), listing].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return acc;
+  }, {});
+}
+
 function emptyData(): SupabaseModerationData {
   return {
     userId: null,
@@ -260,6 +279,7 @@ function emptyData(): SupabaseModerationData {
     cases: [],
     complaints: [],
     listingsById: {},
-    usersById: {}
+    usersById: {},
+    listingsBySellerId: {}
   };
 }

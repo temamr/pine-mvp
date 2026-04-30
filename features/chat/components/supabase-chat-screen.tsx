@@ -4,8 +4,8 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Check, HandCoins, ImagePlus, MapPin, MessageSquare, PackageCheck, Send, X } from "lucide-react";
-import type { Conversation, DealType, ID, Listing, Message, Offer } from "@/lib/domain";
+import { Camera, Check, HandCoins, ImagePlus, MessageSquare, Send, ShieldAlert, Truck, X } from "lucide-react";
+import type { Conversation, Deal, ID, Listing, Message, Offer } from "@/lib/domain";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,36 +13,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { useSupabaseSession } from "@/features/auth/components/use-supabase-session";
 import {
   acceptSupabaseOffer,
+  confirmSupabaseDealCompleted,
   counterSupabaseOffer,
   createSupabaseOffer,
   declineSupabaseOffer,
   loadSupabaseConversations,
   loadSupabaseThread,
-  sendSupabaseAttachmentNotice,
+  markSupabaseDealShipped,
+  sendSupabaseImageAttachment,
   sendSupabaseMessage,
   subscribeToSupabaseThread
 } from "@/features/chat/lib/supabase-chat";
-import { createSupabaseSafeDeal } from "@/features/deals/lib/supabase-deals";
+import { createSupabaseComplaint } from "@/features/moderation/lib/supabase-moderation";
 import { STATUS_TONE } from "@/lib/theme";
 import { cn } from "@/lib/utils/cn";
 import { formatMoney, formatRelativeDate } from "@/lib/utils/format";
-import { dealTypeLabel, listingStatusLabel, offerStatusLabel } from "@/lib/utils/labels";
-
-const quickReplies = ["Да, в наличии", "Могу сегодня после 18:00", "Пришлю дополнительные фото", "Готов оформить сделку"];
-const dealTypeActions = [
-  { id: "meetup", type: "meetup" as DealType, title: "Личная встреча", description: "Встречаетесь лично и подтверждаете завершение после передачи товара." },
-  { id: "courier-seller", type: "courier" as DealType, title: "Доставка за счет продавца", description: "Продавец берет доставку на себя, а статус отправки отслеживается в сделке." },
-  { id: "courier-buyer", type: "courier" as DealType, title: "Доставка за счет покупателя", description: "Стоимость доставки оплачивает покупатель, а статус идет по этапам сделки." }
-] as const;
+import { listingStatusLabel, offerStatusLabel } from "@/lib/utils/labels";
 
 type ThreadState = {
   conversation: Conversation | null;
+  deal: Deal | null;
   listing: Listing | null;
   messages: Message[];
   offers: Offer[];
@@ -63,6 +58,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
   const [selectedId, setSelectedId] = React.useState(initialConversationId ?? "");
   const [thread, setThread] = React.useState<ThreadState>({
     conversation: null,
+    deal: null,
     listing: null,
     messages: [],
     offers: []
@@ -71,14 +67,17 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
   const [offerAmount, setOfferAmount] = React.useState("");
   const [offerMessage, setOfferMessage] = React.useState("Готов забрать сегодня, если цена подойдет.");
   const [busyAction, setBusyAction] = React.useState<string | null>(null);
+  const photoInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? thread.conversation;
   const listing = selected ? listingsById[selected.listingId] ?? thread.listing : thread.listing;
+  const deal = thread.deal;
   const currentUserId = user?.id ?? "";
   const canCreateOffer = Boolean(selected && selected.buyerId === currentUserId);
   const acceptedOffer = thread.offers.find((offer) => offer.status === "accepted");
   const lowball = listing ? Number(offerAmount) > 0 && Number(offerAmount) < listing.price.amount * 0.75 : false;
-  const dealLocked = selected?.status === "completed" || listing?.status === "sold";
+  const sellerCanMarkShipped = Boolean(deal && deal.sellerId === currentUserId && deal.status !== "completed" && deal.status !== "cancelled" && deal.status !== "in_transit");
+  const buyerCanComplete = Boolean(deal && deal.buyerId === currentUserId && deal.status !== "completed" && deal.status !== "cancelled");
 
   const reloadConversations = React.useCallback(async () => {
     setConversationLoading(true);
@@ -186,6 +185,12 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
         if (offer.status === "accepted") {
           void reloadThread(selectedId);
         }
+      },
+      onDealChange: (nextDeal) => {
+        setThread((current) => ({
+          ...current,
+          deal: nextDeal
+        }));
       }
     });
   }, [reloadThread, selectedId, user]);
@@ -219,23 +224,23 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
     }
   }
 
-  async function submitAttachment(label: string) {
+  async function submitImageAttachment(file: File) {
     if (!selected) {
       return;
     }
 
-    setBusyAction(label);
+    setBusyAction("image");
 
     try {
-      const message = await sendSupabaseAttachmentNotice(selected.id, label);
+      const message = await sendSupabaseImageAttachment(selected.id, file);
       setThread((current) => ({
         ...current,
         messages: upsertById(current.messages, message).sort(sortByCreatedAt)
       }));
-      toast({ title: "Вложение добавлено", description: "Файл отмечен в диалоге." });
+      toast({ title: "Фото отправлено", description: "Изображение добавлено в переписку." });
     } catch (error) {
       toast({
-        title: "Вложение не отправлено",
+        title: "Фото не отправлено",
         description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
@@ -297,7 +302,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
       }));
 
       if (status === "accepted") {
-        toast({ title: "Оффер принят", description: "Товар переведен в резерв атомарной RPC-функцией." });
+        toast({ title: "Оффер принят", description: "Сделка создана автоматически, товар переведен в резерв." });
       } else if (status === "declined") {
         toast({ title: "Оффер отклонен" });
       } else {
@@ -316,24 +321,70 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
     }
   }
 
-  async function startSafeDeal(type: DealType) {
+  async function markShipped() {
     if (!selected) {
       return;
     }
 
-    setBusyAction(`deal:${type}`);
+    setBusyAction("deal:shipped");
 
     try {
-      await createSupabaseSafeDeal(selected.id, type);
-      toast({ title: "Сделка создана", description: `${dealTypeLabel[type]} добавлена в ваши сделки.` });
-      router.push("/deals");
+      const nextDeal = await markSupabaseDealShipped(selected.id);
+      setThread((current) => ({ ...current, deal: nextDeal }));
+      toast({ title: "Товар отправлен", description: "Покупатель увидит обновление прямо в чате." });
+      void reloadThread(selected.id);
     } catch (error) {
-      const description = error instanceof Error ? error.message : "Попробуйте еще раз.";
       toast({
-        title: "Сделка не создана",
-        description: description.includes("accepted_offer_required")
-          ? "Сначала продавец должен принять оффер в этом диалоге."
-          : description
+        title: "Статус не обновлен",
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function confirmDealCompleted() {
+    if (!selected) {
+      return;
+    }
+
+    setBusyAction("deal:completed");
+
+    try {
+      const nextDeal = await confirmSupabaseDealCompleted(selected.id);
+      setThread((current) => ({ ...current, deal: nextDeal }));
+      toast({ title: "Сделка завершена", description: "Товар отмечен как проданный, можно оставить отзыв." });
+      void reloadThread(selected.id);
+      void reloadConversations();
+    } catch (error) {
+      toast({
+        title: "Не удалось завершить сделку",
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function reportDealIssue() {
+    if (!selected) {
+      return;
+    }
+
+    setBusyAction("deal:complaint");
+
+    try {
+      await createSupabaseComplaint({
+        targetType: "conversation",
+        targetId: selected.id,
+        reason: "other",
+        details: "Нужна помощь модерации по текущей сделке."
+      });
+      toast({ title: "Обращение отправлено", description: "Модерация подключится к спорной ситуации." });
+    } catch (error) {
+      toast({
+        title: "Не удалось отправить обращение",
+        description: error instanceof Error ? error.message : "Попробуйте еще раз."
       });
     } finally {
       setBusyAction(null);
@@ -374,7 +425,7 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
   }
 
   return (
-    <div className="grid min-w-0 gap-4 lg:h-[calc(100dvh-7rem)] lg:grid-cols-[17rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-4 lg:h-[calc(100dvh-7rem)] lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)]">
       <Card className="min-w-0 overflow-hidden bg-card/94 lg:h-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -425,47 +476,26 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
                     <Badge variant={STATUS_TONE[listing.status]}>{listingStatusLabel[listing.status]}</Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{formatMoney(listing.price)}</p>
+                  {deal ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Сделка активна: все ключевые обновления и подтверждения происходят внутри этого чата.
+                    </p>
+                  ) : acceptedOffer ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Оффер принят. Сделка создана автоматически, можно согласовать отправку и подтверждение.
+                    </p>
+                  ) : null}
                 </div>
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="secondary" disabled={dealLocked}>
-                      <PackageCheck className="h-4 w-4" />
-                      {dealLocked ? "Сделка завершена" : "Оформить сделку"}
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right">
-                    <SheetHeader>
-                      <SheetTitle>Оформление сделки</SheetTitle>
-                    </SheetHeader>
-                    <div className="mt-6 grid gap-3">
-                      {dealLocked ? (
-                        <div className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">
-                          По этому диалогу сделка уже завершена. Повторное оформление недоступно.
-                        </div>
-                      ) : !acceptedOffer ? (
-                        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900 dark:border-yellow-500/40 dark:bg-yellow-500/15 dark:text-yellow-100">
-                          Для оформления сделки нужен принятый оффер. После принятия цена подтянется автоматически.
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border bg-background p-3 text-sm">
-                          <p className="font-semibold">Принятый оффер: {formatMoney(acceptedOffer.amount)}</p>
-                          <p className="mt-1 text-muted-foreground">Эта сумма будет закреплена в сделке.</p>
-                        </div>
-                      )}
-                      {dealTypeActions.map((item) => (
-                        <button
-                          key={item.id}
-                          className="rounded-lg border bg-background p-4 text-left transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={dealLocked || !acceptedOffer || busyAction === `deal:${item.type}`}
-                          onClick={() => startSafeDeal(item.type)}
-                        >
-                          <p className="font-semibold">{item.title}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </SheetContent>
-                </Sheet>
+                {sellerCanMarkShipped ? (
+                  <Button variant="secondary" disabled={busyAction === "deal:shipped"} onClick={markShipped}>
+                    <Truck className="h-4 w-4" />
+                    Товар отправлен
+                  </Button>
+                ) : buyerCanComplete ? (
+                  <Button variant="secondary" disabled={busyAction === "deal:completed"} onClick={confirmDealCompleted}>
+                    Сделка состоялась
+                  </Button>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -490,31 +520,28 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
                     )}
                   </div>
                   <div className="shrink-0 border-t p-3 sm:p-4">
-                    <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-                      {quickReplies.map((reply) => (
-                        <Button key={reply} className="shrink-0" variant="outline" size="sm" onClick={() => submitMessage(reply)}>
-                          {reply}
-                        </Button>
-                      ))}
-                    </div>
-                    <div className="grid min-w-0 gap-2 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto]">
+                    <div className="grid min-w-0 gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) {
+                            void submitImageAttachment(file);
+                          }
+                          event.currentTarget.value = "";
+                        }}
+                      />
                       <Button
                         variant="outline"
                         size="icon"
                         aria-label="Фото"
-                        disabled={busyAction === "Фото"}
-                        onClick={() => submitAttachment("Фото")}
+                        disabled={busyAction === "image"}
+                        onClick={() => photoInputRef.current?.click()}
                       >
                         <ImagePlus className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Геолокация"
-                        disabled={busyAction === "Геолокация"}
-                        onClick={() => submitAttachment("Геолокация")}
-                      >
-                        <MapPin className="h-4 w-4" />
                       </Button>
                       <Input
                         value={messageText}
@@ -526,11 +553,22 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
                           }
                         }}
                       />
-                      <Button className="w-full sm:w-auto" disabled={busyAction === "message"} onClick={() => submitMessage()}>
+                      <Button size="sm" className="w-full px-3 sm:w-auto" disabled={busyAction === "message"} onClick={() => submitMessage()}>
                         <Send className="h-4 w-4" />
                         Отправить
                       </Button>
                     </div>
+                    {deal?.status === "completed" ? (
+                      <div className="mt-3 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                        Если после завершения сделки возникла спорная ситуация, можно подключить модерацию.
+                        <div className="mt-3">
+                          <Button variant="outline" size="sm" disabled={busyAction === "deal:complaint"} onClick={reportDealIssue}>
+                            <ShieldAlert className="h-4 w-4" />
+                            Написать в модерацию
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
@@ -623,9 +661,16 @@ function MessageBubble({ message, currentUserId }: { message: Message; currentUs
           <span className="text-xs opacity-75">{formatRelativeDate(message.createdAt)}</span>
         </div>
         {message.type === "attachment" ? (
-          <div className="flex items-center gap-2">
-            <Camera className="h-4 w-4" />
-            <span>{message.text ?? "Вложение"}</span>
+          <div className="grid gap-2">
+            {message.attachment.type === "image" && message.attachment.url ? (
+              <div className="relative h-48 w-full overflow-hidden rounded-lg bg-muted">
+                <Image src={message.attachment.url} alt={message.attachment.alt ?? "Фото"} fill className="object-cover" sizes="(max-width: 768px) 100vw, 40vw" />
+              </div>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <Camera className="h-4 w-4" />
+              <span>{message.text ?? "Вложение"}</span>
+            </div>
           </div>
         ) : (
           <p className="text-sm leading-6">{message.text}</p>

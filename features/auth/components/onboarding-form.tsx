@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { validateDisplayName } from "@/lib/validation/display-name";
 
 export function OnboardingForm() {
   const router = useRouter();
@@ -127,6 +128,16 @@ export function OnboardingForm() {
       toast({
         title: "Нужно согласие",
         description: "Подтвердите согласие на обработку персональных данных."
+      });
+      return;
+    }
+
+    const displayNameError = validateDisplayName(displayName);
+
+    if (displayNameError) {
+      toast({
+        title: "Имя не подходит",
+        description: displayNameError
       });
       return;
     }
