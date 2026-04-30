@@ -263,7 +263,12 @@ export function SupabaseModerationScreen() {
           <div className="grid gap-3">
             {currentData.complaints.length ? (
               currentData.complaints.map((complaint) => {
-                const targetListing = complaint.targetType === "listing" ? currentData.listingsById[complaint.targetId] : null;
+                const targetConversation = complaint.targetType === "conversation" ? currentData.conversationsById[complaint.targetId] : null;
+                const targetListing = complaint.targetType === "listing"
+                  ? currentData.listingsById[complaint.targetId]
+                  : targetConversation
+                    ? currentData.listingsById[targetConversation.listingId]
+                    : null;
                 const reporter = currentData.usersById[complaint.reporterId];
                 const targetUserId = complaint.targetType === "user" ? complaint.targetId : targetListing?.sellerId;
                 const targetUser = targetUserId ? currentData.usersById[targetUserId] : null;
@@ -299,6 +304,10 @@ export function SupabaseModerationScreen() {
                         ) : complaint.targetType === "user" ? (
                           <Button asChild variant="outline" size="sm">
                             <Link href={`/users/${complaint.targetId}`}>Открыть профиль</Link>
+                          </Button>
+                        ) : complaint.targetType === "conversation" ? (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/chat/${complaint.targetId}`}>Открыть диалог</Link>
                           </Button>
                         ) : null}
                       </div>

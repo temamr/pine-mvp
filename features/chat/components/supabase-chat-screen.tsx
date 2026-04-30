@@ -60,7 +60,7 @@ type SupabaseChatScreenProps = {
 export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreenProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { loading: sessionLoading, user } = useSupabaseSession();
+  const { loading: sessionLoading, user, profile } = useSupabaseSession();
   const [conversationLoading, setConversationLoading] = React.useState(true);
   const [threadLoading, setThreadLoading] = React.useState(false);
   const [conversations, setConversations] = React.useState<Conversation[]>([]);
@@ -683,7 +683,15 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
                       </div>
                     ) : thread.messages.length ? (
                       thread.messages.map((message) => (
-                        <MessageBubble key={message.id} message={message} currentUserId={currentUserId} />
+                        <MessageBubble
+                          key={message.id}
+                          message={message}
+                          currentUserId={currentUserId}
+                          currentUserName={profile?.display_name ?? "Вы"}
+                          currentUserAvatar={profile?.avatar_url ?? undefined}
+                          counterpartName={counterpart?.displayName ?? "Собеседник"}
+                          counterpartAvatar={counterpart?.avatarUrl}
+                        />
                       ))
                     ) : (
                       <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
@@ -849,7 +857,21 @@ export function SupabaseChatScreen({ initialConversationId }: SupabaseChatScreen
   );
 }
 
-function MessageBubble({ message, currentUserId }: { message: Message; currentUserId: string }) {
+function MessageBubble({
+  message,
+  currentUserId,
+  currentUserName,
+  currentUserAvatar,
+  counterpartName,
+  counterpartAvatar
+}: {
+  message: Message;
+  currentUserId: string;
+  currentUserName: string;
+  currentUserAvatar?: string;
+  counterpartName: string;
+  counterpartAvatar?: string;
+}) {
   const mine = message.senderId === currentUserId;
   const system = message.type === "system";
 
@@ -857,35 +879,42 @@ function MessageBubble({ message, currentUserId }: { message: Message; currentUs
     return <div className="mx-auto max-w-md rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">{message.text}</div>;
   }
 
+  const senderName = mine ? currentUserName : counterpartName;
+  const senderAvatar = mine ? currentUserAvatar : counterpartAvatar;
+
   return (
     <div className={mine ? "flex justify-end" : "flex justify-start"}>
-      <div
-        className={cn(
-          "max-w-[88%] break-words rounded-lg px-4 py-3",
-          mine ? "bg-primary text-primary-foreground" : "border bg-background"
-        )}
-      >
-        <div className="mb-2 flex items-center gap-2">
-          {!mine ? (
-            <Avatar className="h-6 w-6">
-              <AvatarFallback>P</AvatarFallback>
-            </Avatar>
-          ) : null}
-          <span className="text-xs opacity-75">{formatRelativeDate(message.createdAt)}</span>
+      <div className="max-w-[88%]">
+        <div className={cn("mb-1 flex items-center gap-2 px-1", mine ? "justify-end" : "justify-start")}>
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={senderAvatar} />
+            <AvatarFallback>{senderName.slice(0, 2)}</AvatarFallback>
+          </Avatar>
+          <span className="text-xs font-medium text-muted-foreground">{senderName}</span>
         </div>
-        {message.type === "attachment" ? (
-          <div className="grid gap-2">
-            {message.attachment.type === "image" && message.attachment.url ? (
-              <div className="relative h-48 w-full overflow-hidden rounded-lg bg-muted">
-                <Image src={message.attachment.url} alt={message.attachment.alt ?? "Фото"} fill className="object-cover" sizes="(max-width: 768px) 100vw, 40vw" />
-              </div>
-            ) : null}
-            {message.text ? <p className="text-sm leading-6">{message.text}</p> : null}
+        <div
+          className={cn(
+            "break-words rounded-lg px-4 py-3",
+            mine ? "bg-primary text-primary-foreground" : "border bg-background"
+          )}
+        >
+          <div className={cn("mb-2 flex items-center", mine ? "justify-end" : "justify-start")}>
+            <span className="text-xs opacity-75">{formatRelativeDate(message.createdAt)}</span>
           </div>
-        ) : (
-          <p className="text-sm leading-6">{message.text}</p>
-        )}
-        <div className="mt-1 text-right text-[11px] opacity-70">{message.status}</div>
+          {message.type === "attachment" ? (
+            <div className="grid gap-2">
+              {message.attachment.type === "image" && message.attachment.url ? (
+                <div className="relative h-48 w-full overflow-hidden rounded-lg bg-muted">
+                  <Image src={message.attachment.url} alt={message.attachment.alt ?? "Фото"} fill className="object-cover" sizes="(max-width: 768px) 100vw, 40vw" />
+                </div>
+              ) : null}
+              {message.text ? <p className="text-sm leading-6">{message.text}</p> : null}
+            </div>
+          ) : (
+            <p className="text-sm leading-6">{message.text}</p>
+          )}
+          <div className="mt-1 text-right text-[11px] opacity-70">{message.status}</div>
+        </div>
       </div>
     </div>
   );
@@ -902,7 +931,9 @@ function OfferRow({
   busyAction: string | null;
   onStatus: (offer: Offer, status: "accepted" | "declined") => Promise<void>;
 }) {
-  const canModerateOffer = offer.status === "sent" && offer.sellerId === currentUserId;
+  const canModerateOffer =
+    (offer.status === "sent" && offer.sellerId === currentUserId) ||
+    (offer.status === "countered" && offer.buyerId === currentUserId);
 
   return (
     <div className="rounded-lg border bg-background p-3">

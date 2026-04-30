@@ -1,8 +1,9 @@
 "use client";
 
-import type { Complaint, ID, Listing, ModerationCase, User } from "@/lib/domain";
+import type { Complaint, Conversation, ID, Listing, ModerationCase, User } from "@/lib/domain";
 import {
   mapComplaint,
+  mapConversation,
   mapListing,
   mapModerationCase,
   mapProfileToUser,
@@ -19,6 +20,7 @@ export type SupabaseModerationData = {
   cases: ModerationCase[];
   complaints: Complaint[];
   listingsById: Record<ID, Listing>;
+  conversationsById: Record<ID, Conversation>;
   usersById: Record<ID, User>;
   listingsBySellerId: Record<ID, Listing[]>;
 };
@@ -75,9 +77,12 @@ export async function fetchSupabaseModerationData(): Promise<SupabaseModerationD
 
   const cases = caseRows.map(mapModerationCase);
   const complaints = complaintRows.map(mapComplaint);
+  const conversationIds = [...new Set(complaints.filter((item) => item.targetType === "conversation").map((item) => item.targetId))];
+  const conversationsById = await loadConversationsById(conversationIds);
   const listingIds = [
     ...cases.map((item) => item.listingId),
-    ...complaints.filter((item) => item.targetType === "listing").map((item) => item.targetId)
+    ...complaints.filter((item) => item.targetType === "listing").map((item) => item.targetId),
+    ...Object.values(conversationsById).map((conversation) => conversation.listingId)
   ];
   const listingsById = await loadListingsById([...new Set(listingIds)]);
   const userIds = new Set<ID>([...complaints.map((item) => item.reporterId)]);
@@ -113,6 +118,7 @@ export async function fetchSupabaseModerationData(): Promise<SupabaseModerationD
     cases,
     complaints,
     listingsById,
+    conversationsById,
     usersById,
     listingsBySellerId
   };
@@ -261,6 +267,21 @@ async function loadUsersById(userIds: ID[]) {
   return Object.fromEntries(data.map((profile) => [profile.id, mapProfileToUser(profile)]));
 }
 
+async function loadConversationsById(conversationIds: ID[]) {
+  if (!conversationIds.length) {
+    return {};
+  }
+
+  const client = createSupabaseBrowserClient();
+  const { data, error } = await client.from("conversations").select("*").in("id", conversationIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return Object.fromEntries(data.map((conversation) => [conversation.id, mapConversation(conversation)]));
+}
+
 function groupListingsBySeller(listingsById: Record<ID, Listing>) {
   return Object.values(listingsById).reduce<Record<ID, Listing[]>>((acc, listing) => {
     acc[listing.sellerId] = [...(acc[listing.sellerId] ?? []), listing].sort(
@@ -279,6 +300,7 @@ function emptyData(): SupabaseModerationData {
     cases: [],
     complaints: [],
     listingsById: {},
+    conversationsById: {},
     usersById: {},
     listingsBySellerId: {}
   };
