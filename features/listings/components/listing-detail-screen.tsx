@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BarChart3, Flag, Heart, ImageOff, MapPin, MessageCircle, Pencil, ShieldCheck, Star, Tag } from "lucide-react";
 import type { Listing, User } from "@/lib/domain";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,8 +137,10 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
         (item) =>
           item.categoryId === currentListing.categoryId &&
           item.id !== currentListing.id &&
-          (item.status === "published" || item.status === "reserved")
+        (item.status === "published" || item.status === "reserved")
       );
+  const visibleAttributes = currentListing.attributes.filter((attribute) => attribute.label !== "Готовность");
+  const ownerReadinessLabel = listingStatusLabel[currentListing.status];
 
   async function handleStartChat() {
     if (supabaseEnabled) {
@@ -360,12 +363,14 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                     </div>
                     <p className="mt-2 text-2xl font-bold">{favoriteCount}</p>
                   </div>
-                  <Button asChild className="sm:col-span-2">
-                    <Link href="/profile/listings">
-                      <Pencil className="h-4 w-4" />
-                      Редактировать объявление
-                    </Link>
-                  </Button>
+                  {listing.status !== "sold" ? (
+                    <Button asChild className="sm:col-span-2">
+                      <Link href={`/sell?edit=${listing.id}`}>
+                        <Pencil className="h-4 w-4" />
+                        Редактировать объявление
+                      </Link>
+                    </Button>
+                  ) : null}
                 </div>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -416,9 +421,20 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
             </CardHeader>
             <CardContent className="grid gap-3">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{seller?.displayName ?? "Продавец Pine"}</p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={seller?.avatarUrl} />
+                    <AvatarFallback>{(seller?.displayName ?? "PP").slice(0, 2)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <Link
+                      href={seller ? `/users/${seller.id}` : "#"}
+                      className="block truncate font-semibold hover:text-primary"
+                    >
+                      {seller?.displayName ?? "Продавец Pine"}
+                    </Link>
                   <p className="text-sm text-muted-foreground">{seller?.completedDealsCount ?? 0} завершенных сделок</p>
+                  </div>
                 </div>
                 <Badge variant="success">
                   <Star className="mr-1 h-3 w-3 fill-current" />
@@ -472,39 +488,43 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
-        <Card className="bg-white/92">
+          <Card className="bg-white/92">
           <CardHeader>
             <CardTitle>Описание</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="leading-7 text-muted-foreground">{listing.description}</p>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              {listing.attributes.map((attribute) => (
+              {visibleAttributes.map((attribute) => (
                 <div key={attribute.label} className="rounded-lg border bg-background p-3">
                   <p className="text-xs text-muted-foreground">{attribute.label}</p>
                   <p className="font-semibold">{attribute.value}</p>
                 </div>
               ))}
+              {isOwnListing ? (
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Готовность</p>
+                  <p className="font-semibold">{ownerReadinessLabel}</p>
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-white/92">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" />
               Локация
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="surface-grid flex h-56 items-center justify-center rounded-lg border bg-background">
-              <div className="rounded-lg bg-white px-4 py-3 text-center shadow-soft">
-                <p className="font-semibold">{listing.location.label}</p>
-                <p className="text-sm text-muted-foreground">Map provider будет подключен позже</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+            <p className="font-semibold">{listing.location.label}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Город: {listing.location.city || "не указан"} · Регион: {listing.location.region || "не указан"} · Страна: {listing.location.country || "не указана"}
+            </p>
+        </CardContent>
+      </Card>
       </section>
 
       <section className="grid gap-4">

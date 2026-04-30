@@ -170,6 +170,11 @@ export function SupabaseMyListingsScreen() {
                         <Button asChild variant="outline" size="sm">
                           <Link href={`/listings/${listing.id}`}>Открыть</Link>
                         </Button>
+                        {listing.status !== "sold" ? (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/sell?edit=${listing.id}`}>Редактировать</Link>
+                          </Button>
+                        ) : null}
                         {listing.status === "needs_changes" || listing.status === "draft" ? (
                           <Button size="sm" onClick={() => void resubmit(listing.id)}>
                             <RotateCcw className="h-4 w-4" />

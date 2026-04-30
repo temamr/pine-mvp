@@ -249,6 +249,16 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["listing_views"]["Row"]>;
         Relationships: [];
       };
+      hidden_conversations: {
+        Row: {
+          user_id: UUID;
+          conversation_id: UUID;
+          created_at: Timestamp;
+        };
+        Insert: Partial<Database["public"]["Tables"]["hidden_conversations"]["Row"]> & Pick<Database["public"]["Tables"]["hidden_conversations"]["Row"], "user_id" | "conversation_id">;
+        Update: Partial<Database["public"]["Tables"]["hidden_conversations"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -311,11 +321,25 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["deals"]["Row"];
       };
+      create_counter_offer: {
+        Args: {
+          p_offer_id: UUID;
+          p_amount: number;
+          p_message?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["offers"]["Row"];
+      };
       mark_deal_shipped_by_seller: {
         Args: {
           p_conversation_id: UUID;
         };
         Returns: Database["public"]["Tables"]["deals"]["Row"];
+      };
+      hide_conversation: {
+        Args: {
+          p_conversation_id: UUID;
+        };
+        Returns: void;
       };
       confirm_deal_completed_by_buyer: {
         Args: {

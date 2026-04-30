@@ -1,13 +1,14 @@
 "use client";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Conversation, Deal, ID, Listing, Message, Offer } from "@/lib/domain";
+import type { Conversation, Deal, ID, Listing, Message, Offer, User } from "@/lib/domain";
 import {
   mapConversation,
   mapDeal,
   mapListing,
   mapMessage,
   mapOffer,
+  mapProfileToUser,
   type SupabaseListingRecord
 } from "@/lib/repositories/supabase/mappers";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -36,6 +37,16 @@ export async function loadSupabaseConversations(): Promise<ConversationBundle> {
     };
   }
 
+  const { data: hiddenRows, error: hiddenError } = await client
+    .from("hidden_conversations")
+    .select("conversation_id")
+    .eq("user_id", user.id);
+
+  if (hiddenError) {
+    throw hiddenError;
+  }
+
+  const hiddenIds = new Set(hiddenRows.map((item) => item.conversation_id));
   const { data: conversations, error } = await client
     .from("conversations")
     .select("*")
@@ -46,24 +57,39 @@ export async function loadSupabaseConversations(): Promise<ConversationBundle> {
     throw error;
   }
 
-  const listingIds = [...new Set(conversations.map((conversation) => conversation.listing_id))];
+  const visibleConversations = conversations.filter((conversation) => !hiddenIds.has(conversation.id));
+  const listingIds = [...new Set(visibleConversations.map((conversation) => conversation.listing_id))];
   const listingsById = await loadListingsById(client, listingIds);
 
   return {
-    conversations: conversations.map(mapConversation),
+    conversations: visibleConversations.map(mapConversation),
     listingsById
   };
 }
 
 export async function loadSupabaseThread(conversationId: ID) {
   const client = createSupabaseBrowserClient();
-  const [{ data: conversation, error: conversationError }, { data: messages, error: messagesError }, { data: offers, error: offersError }, { data: dealRow, error: dealError }] =
+  const [
+    {
+      data: { user },
+      error: authError
+    },
+    { data: conversation, error: conversationError },
+    { data: messages, error: messagesError },
+    { data: offers, error: offersError },
+    { data: dealRow, error: dealError }
+  ] =
     await Promise.all([
+      client.auth.getUser(),
       client.from("conversations").select("*").eq("id", conversationId).maybeSingle(),
       client.from("messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true }),
       client.from("offers").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: false }),
       client.from("deals").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(1).maybeSingle()
     ]);
+
+  if (authError) {
+    throw authError;
+  }
 
   if (conversationError) {
     throw conversationError;
@@ -89,9 +115,31 @@ export async function loadSupabaseThread(conversationId: ID) {
     conversation: conversation ? mapConversation(conversation) : null,
     deal: dealRow ? mapDeal(dealRow) : null,
     listing,
+    counterpart: conversation
+      ? await loadConversationCounterpart(client, conversation, user?.id ?? null)
+      : null,
     messages: messages.map(mapMessage),
     offers: offers.map(mapOffer)
   };
+}
+
+async function loadConversationCounterpart(
+  client: SupabaseClient<Database>,
+  conversation: Tables<"conversations">,
+  currentUserId: ID | null
+): Promise<User | null> {
+  if (!currentUserId) {
+    return null;
+  }
+
+  const counterpartId = conversation.buyer_id === currentUserId ? conversation.seller_id : conversation.buyer_id;
+  const { data, error } = await client.from("profiles").select("*").eq("id", counterpartId).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapProfileToUser(data) : null;
 }
 
 export async function startSupabaseConversation(listingId: ID): Promise<ID> {
@@ -236,7 +284,7 @@ export async function sendSupabaseImageAttachment(conversationId: ID, file: File
       conversation_id: conversationId,
       sender_id: user.id,
       type: "attachment",
-      text: "Фото добавлено в переписку.",
+      text: null,
       attachment,
       status: "sent"
     })
@@ -341,6 +389,21 @@ export async function counterSupabaseOffer(offerId: ID, conversationId: ID): Pro
   return mapOffer(data);
 }
 
+export async function createSupabaseCounterOffer(offerId: ID, amount: number, message?: string): Promise<Offer> {
+  const client = createSupabaseBrowserClient();
+  const { data, error } = await client.rpc("create_counter_offer", {
+    p_offer_id: offerId,
+    p_amount: amount,
+    p_message: message ?? null
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapOffer(data);
+}
+
 export async function markSupabaseDealShipped(conversationId: ID): Promise<Deal> {
   const client = createSupabaseBrowserClient();
   const { data, error } = await client.rpc("mark_deal_shipped_by_seller", {
@@ -365,6 +428,17 @@ export async function confirmSupabaseDealCompleted(conversationId: ID): Promise<
   }
 
   return mapDeal(data);
+}
+
+export async function hideSupabaseConversation(conversationId: ID): Promise<void> {
+  const client = createSupabaseBrowserClient();
+  const { error } = await client.rpc("hide_conversation", {
+    p_conversation_id: conversationId
+  });
+
+  if (error) {
+    throw error;
+  }
 }
 
 export function subscribeToSupabaseThread(

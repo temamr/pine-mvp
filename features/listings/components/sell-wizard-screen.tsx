@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2, Sparkles, UploadCloud } from "lucide-react";
 import type { Category, ListingCondition } from "@/lib/domain";
 import { LocationMapPreview } from "@/components/maps/location-map-preview";
@@ -11,7 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
-import { createSupabaseListingFromDraft, getSupabaseListingsClient } from "@/features/listings/lib/supabase-listings";
+import {
+  createSupabaseListingFromDraft,
+  fetchEditableSupabaseListing,
+  getSupabaseListingsClient,
+  updateSupabaseListingFromDraft
+} from "@/features/listings/lib/supabase-listings";
 import { mockCategories } from "@/lib/mock/fixtures";
 import { usePineStore } from "@/lib/mock/use-pine-store";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -35,8 +40,10 @@ type ErrorState = Partial<Record<keyof DraftState, string>>;
 
 export function SellWizardScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const supabaseEnabled = isSupabaseConfigured();
+  const editingListingId = searchParams.get("edit");
   const createListing = usePineStore((state) => state.createListing);
   const [step, setStep] = React.useState(0);
   const [errors, setErrors] = React.useState<ErrorState>({});
@@ -87,6 +94,48 @@ export function SellWizardScreen() {
     // update intentionally omitted because it mutates draft state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseEnabled, toast]);
+
+  React.useEffect(() => {
+    if (!supabaseEnabled || !editingListingId) {
+      return;
+    }
+
+    let active = true;
+    setSaving(true);
+
+    fetchEditableSupabaseListing(editingListingId)
+      .then((editable) => {
+        if (!active || !editable) {
+          return;
+        }
+
+        setDraft({
+          categoryId: editable.categoryId,
+          title: editable.title,
+          description: editable.description,
+          price: editable.price,
+          condition: editable.condition,
+          locationLabel: editable.locationLabel,
+          imageUrls: editable.imageUrls
+        });
+        setImageFiles(editable.imageUrls.map(() => null));
+      })
+      .catch((error) => {
+        toast({
+          title: "Не удалось открыть объявление для редактирования",
+          description: error instanceof Error ? error.message : "Попробуйте еще раз."
+        });
+      })
+      .finally(() => {
+        if (active) {
+          setSaving(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [editingListingId, supabaseEnabled, toast]);
 
   const qualityScore = React.useMemo(() => {
     let score = 20;
@@ -250,7 +299,8 @@ export function SellWizardScreen() {
       setSaving(true);
 
       try {
-        const listing = await createSupabaseListingFromDraft({
+        const payload = {
+          listingId: editingListingId ?? undefined,
           categoryId: draft.categoryId,
           title: draft.title,
           description: draft.description,
@@ -260,10 +310,19 @@ export function SellWizardScreen() {
           imageUrls: draft.imageUrls,
           imageFiles,
           submitToModeration
-        });
+        };
 
+        const listing = editingListingId
+          ? await updateSupabaseListingFromDraft({ ...payload, listingId: editingListingId })
+          : await createSupabaseListingFromDraft(payload);
         toast({
-          title: submitToModeration ? "Отправлено на модерацию" : "Черновик сохранен",
+          title: submitToModeration
+            ? editingListingId
+              ? "Изменения отправлены на модерацию"
+              : "Отправлено на модерацию"
+            : editingListingId
+              ? "Изменения сохранены"
+              : "Черновик сохранен",
           description: submitToModeration ? "Объявление отправлено на проверку." : "Черновик сохранен."
         });
         router.push(submitToModeration ? "/profile/listings" : `/listings/${listing.id}`);
@@ -303,8 +362,8 @@ export function SellWizardScreen() {
         <CardHeader>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <Badge variant="secondary">Создание объявления</Badge>
-              <CardTitle className="mt-3 text-2xl">Соберите карточку для модерации</CardTitle>
+              <Badge variant="secondary">{editingListingId ? "Редактирование объявления" : "Создание объявления"}</Badge>
+              <CardTitle className="mt-3 text-2xl">{editingListingId ? "Редактирование объявления" : "Соберите карточку для модерации"}</CardTitle>
             </div>
             <div className="w-full md:w-72">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
@@ -466,10 +525,10 @@ export function SellWizardScreen() {
           Назад
         </Button>
         <div className="hidden md:block" />
-        <Button variant="outline" disabled={saving} onClick={() => void save(false)}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Сохранить черновик
-        </Button>
+          <Button variant="outline" disabled={saving} onClick={() => void save(false)}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {editingListingId ? "Сохранить изменения" : "Сохранить черновик"}
+          </Button>
         {step === steps.length - 1 ? (
           <Button disabled={saving} onClick={() => void save(true)}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

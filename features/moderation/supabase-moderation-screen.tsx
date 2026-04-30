@@ -149,7 +149,10 @@ export function SupabaseModerationScreen() {
         current
           ? {
               ...current,
-              complaints: current.complaints.map((item) => (item.id === next.id ? next : item))
+              complaints:
+                next.status === "resolved" || next.status === "dismissed"
+                  ? current.complaints.filter((item) => item.id !== next.id)
+                  : current.complaints.map((item) => (item.id === next.id ? next : item))
             }
           : current
       );
@@ -293,14 +296,13 @@ export function SupabaseModerationScreen() {
                           <Button asChild variant="outline" size="sm">
                             <Link href={`/listings/${complaint.targetId}`}>Открыть объявление</Link>
                           </Button>
+                        ) : complaint.targetType === "user" ? (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/users/${complaint.targetId}`}>Открыть профиль</Link>
+                          </Button>
                         ) : null}
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setExpandedComplaintId(expanded ? null : complaint.id)}>
-                          {expanded ? "Скрыть детали" : "Подробнее"}
-                        </Button>
-                      </div>
-                      {expanded ? (
+                      {complaint.targetType === "conversation" && expanded ? (
                         <div className="grid gap-4 rounded-lg border bg-background p-4 lg:grid-cols-[1.15fr_0.85fr]">
                           <div className="grid gap-4">
                             {targetListing ? (
@@ -352,6 +354,13 @@ export function SupabaseModerationScreen() {
                               </div>
                             ) : null}
                           </div>
+                        </div>
+                      ) : null}
+                      {complaint.targetType === "conversation" ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setExpandedComplaintId(expanded ? null : complaint.id)}>
+                            {expanded ? "Скрыть детали" : "Подробнее"}
+                          </Button>
                         </div>
                       ) : null}
                       {currentData.isStaff ? (

@@ -8,6 +8,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 export type SupabaseListingDraft = {
+  listingId?: ID;
   categoryId: ID;
   title: string;
   description: string;
@@ -26,6 +27,17 @@ export type ListingDetailsData = {
   similar: Listing[];
   isFavorite: boolean;
   favoriteCount: number;
+};
+
+export type EditableListingDraft = {
+  id: ID;
+  categoryId: ID;
+  title: string;
+  description: string;
+  price: string;
+  condition: ListingCondition;
+  locationLabel: string;
+  imageUrls: string[];
 };
 
 export function getSupabaseListingsClient() {
@@ -232,6 +244,141 @@ export async function createSupabaseListingFromDraft(input: SupabaseListingDraft
       listing_id: listingRow.id,
       status: "open",
       note: "Объявление ожидает первой проверки."
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  return mapListing({
+    ...listingRow,
+    listing_images: imageRows
+  });
+}
+
+export async function fetchEditableSupabaseListing(listingId: ID): Promise<EditableListingDraft | null> {
+  const client = createSupabaseBrowserClient();
+  const {
+    data: { user },
+    error: authError
+  } = await client.auth.getUser();
+
+  if (authError) {
+    throw authError;
+  }
+
+  if (!user) {
+    throw new Error("Войдите, чтобы редактировать объявление.");
+  }
+
+  const { data, error } = await client
+    .from("listings")
+    .select("*, listing_images(*)")
+    .eq("id", listingId)
+    .eq("seller_id", user.id)
+    .returns<SupabaseListingRecord[]>()
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const listing = mapListing(data);
+
+  if (listing.status === "sold") {
+    throw new Error("Проданное объявление нельзя редактировать.");
+  }
+
+  return {
+    id: listing.id,
+    categoryId: listing.categoryId,
+    title: listing.title,
+    description: listing.description,
+    price: String(listing.price.amount),
+    condition: listing.condition,
+    locationLabel: listing.location.label,
+    imageUrls: listing.images.map((image) => image.url)
+  };
+}
+
+export async function updateSupabaseListingFromDraft(input: SupabaseListingDraft & { listingId: ID }): Promise<Listing> {
+  const client = createSupabaseBrowserClient();
+  const {
+    data: { user },
+    error: authError
+  } = await client.auth.getUser();
+
+  if (authError) {
+    throw authError;
+  }
+
+  if (!user) {
+    throw new Error("Войдите, чтобы редактировать объявление.");
+  }
+
+  const { data: existingListing, error: existingListingError } = await client
+    .from("listings")
+    .select("status")
+    .eq("id", input.listingId)
+    .eq("seller_id", user.id)
+    .single();
+
+  if (existingListingError) {
+    throw existingListingError;
+  }
+
+  if (existingListing.status === "sold") {
+    throw new Error("Проданное объявление нельзя редактировать.");
+  }
+
+  const status = input.submitToModeration ? "pending" : "draft";
+  const attributes: Json = [
+    { label: "Источник", value: "Веб-публикация" },
+    { label: "Готовность", value: input.submitToModeration ? "На модерации" : "Черновик" }
+  ];
+
+  const { data: listingRow, error: listingError } = await client
+    .from("listings")
+    .update({
+      category_id: input.categoryId,
+      title: input.title,
+      description: input.description,
+      price_amount: input.price,
+      currency: "RUB",
+      condition: input.condition,
+      status,
+      moderation_note: null,
+      attributes,
+      location: {
+        city: input.locationLabel,
+        region: "Россия",
+        country: "Россия",
+        label: input.locationLabel
+      }
+    })
+    .eq("id", input.listingId)
+    .eq("seller_id", user.id)
+    .select("*, listing_images(*)")
+    .returns<SupabaseListingRecord[]>()
+    .single();
+
+  if (listingError) {
+    throw listingError;
+  }
+
+  await client.from("listing_images").delete().eq("listing_id", input.listingId);
+  const imageRows = await uploadAndInsertImages(client, input.listingId, input);
+
+  if (input.submitToModeration) {
+    const { error } = await client.from("moderation_cases").insert({
+      listing_id: input.listingId,
+      status: "open",
+      note: "Объявление обновлено и отправлено на повторную проверку."
     });
 
     if (error) {

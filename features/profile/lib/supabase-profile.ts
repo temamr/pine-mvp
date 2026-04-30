@@ -15,6 +15,11 @@ export type SupabaseProfileTrustData = {
   reviewableDeals: ReviewableDeal[];
 };
 
+export type SupabasePublicProfileData = {
+  profile: Tables<"profiles"> | null;
+  reviews: Review[];
+};
+
 export async function fetchSupabaseProfileTrustData(userId: ID): Promise<SupabaseProfileTrustData> {
   const client = createSupabaseBrowserClient();
   const [{ data: reviews, error: reviewsError }, { data: deals, error: dealsError }, { data: authored, error: authoredError }] =
@@ -52,11 +57,32 @@ export async function fetchSupabaseProfileTrustData(userId: ID): Promise<Supabas
         has_review: authoredKeys.has(`${deal.id}:${recipientId}`)
       };
     })
-    .filter((deal) => deal.recipient_id !== userId);
+    .filter((deal) => deal.recipient_id !== userId && deal.buyer_id !== deal.seller_id);
 
   return {
     reviews: reviews.map(mapReview),
     reviewableDeals
+  };
+}
+
+export async function fetchSupabasePublicProfileData(userId: ID): Promise<SupabasePublicProfileData> {
+  const client = createSupabaseBrowserClient();
+  const [{ data: profile, error: profileError }, { data: reviews, error: reviewsError }] = await Promise.all([
+    client.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    client.from("reviews").select("*").eq("recipient_id", userId).order("created_at", { ascending: false }).limit(8)
+  ]);
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  if (reviewsError) {
+    throw reviewsError;
+  }
+
+  return {
+    profile: profile ?? null,
+    reviews: reviews.map(mapReview)
   };
 }
 
@@ -100,6 +126,10 @@ export async function createSupabaseReview(input: {
 
   if (deal.buyer_id !== user.id && deal.seller_id !== user.id) {
     throw new Error("Вы не участвуете в этой сделке.");
+  }
+
+  if (deal.buyer_id === deal.seller_id) {
+    throw new Error("Нельзя оставить отзыв самому себе.");
   }
 
   const expectedRecipientId = deal.buyer_id === user.id ? deal.seller_id : deal.buyer_id;

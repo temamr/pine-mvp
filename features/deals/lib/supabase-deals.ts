@@ -15,6 +15,7 @@ export type SupabaseDealsData = {
   isStaff: boolean;
   deals: Deal[];
   listingsById: Record<ID, Listing>;
+  reviewableDealIds: ID[];
 };
 
 export async function fetchSupabaseDealsData(): Promise<SupabaseDealsData> {
@@ -34,7 +35,8 @@ export async function fetchSupabaseDealsData(): Promise<SupabaseDealsData> {
       role: null,
       isStaff: false,
       deals: [],
-      listingsById: {}
+      listingsById: {},
+      reviewableDealIds: []
     };
   }
 
@@ -60,13 +62,27 @@ export async function fetchSupabaseDealsData(): Promise<SupabaseDealsData> {
 
   const deals = data.map(mapDeal);
   const listingsById = await loadListingsById([...new Set(deals.map((deal) => deal.listingId))]);
+  const { data: reviews, error: reviewsError } = await client.from("reviews").select("deal_id, recipient_id").eq("author_id", user.id);
+
+  if (reviewsError) {
+    throw reviewsError;
+  }
+
+  const reviewedKeys = new Set(reviews.map((item) => `${item.deal_id}:${item.recipient_id}`));
+  const reviewableDealIds = deals
+    .filter((deal) => {
+      const recipientId = deal.buyerId === user.id ? deal.sellerId : deal.buyerId;
+      return deal.status === "completed" && deal.buyerId !== deal.sellerId && recipientId !== user.id && !reviewedKeys.has(`${deal.id}:${recipientId}`);
+    })
+    .map((deal) => deal.id);
 
   return {
     userId: user.id,
     role: profile?.role ?? null,
     isStaff: profile?.role === "admin" || profile?.role === "moderator",
     deals,
-    listingsById
+    listingsById,
+    reviewableDealIds
   };
 }
 

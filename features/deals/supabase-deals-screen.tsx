@@ -24,7 +24,8 @@ export function SupabaseDealsScreen() {
     role: null,
     isStaff: false,
     deals: [],
-    listingsById: {}
+    listingsById: {},
+    reviewableDealIds: []
   });
   const [loading, setLoading] = React.useState(true);
 
@@ -145,7 +146,7 @@ export function SupabaseDealsScreen() {
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/listings/${deal.listingId}`}>Открыть товар</Link>
                     </Button>
-                    {deal.status === "completed" ? (
+                    {data.reviewableDealIds.includes(deal.id) ? (
                       <Button asChild size="sm">
                         <Link href={`/profile?tab=reviews&reviewDeal=${deal.id}`}>Оставить отзыв</Link>
                       </Button>

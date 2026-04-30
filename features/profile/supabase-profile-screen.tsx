@@ -71,7 +71,7 @@ export function SupabaseProfileScreen() {
   const reviewDealId = searchParams.get("reviewDeal");
   const tab = searchParams.get("tab") === "reviews" ? "reviews" : "account";
   const nextReviewDeal = trustData.reviewableDeals.find(
-    (deal) => !deal.has_review && deal.id === reviewDealId
+    (deal) => !deal.has_review && deal.id === reviewDealId && deal.recipient_id !== user?.id && deal.buyer_id !== deal.seller_id
   );
 
   async function submitReview() {
