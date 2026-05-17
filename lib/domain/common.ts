@@ -4,7 +4,7 @@ export type ISODate = string;
 
 export type Money = {
   amount: number;
-  currency: "USD" | "EUR" | "RUB";
+  currency: "USD" | "EUR" | "RUB" | "AED";
 };
 
 export type GeoPoint = {

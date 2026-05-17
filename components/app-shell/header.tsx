@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/toast";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
+import { LanguageToggle } from "@/components/app-shell/language-toggle";
 import { Badge } from "@/components/ui/badge";
 import { getPrimaryNavItems, getSecondaryNavItems } from "@/components/app-shell/nav-items";
 import { useSupabaseSession } from "@/features/auth/components/use-supabase-session";
@@ -163,6 +164,7 @@ export function Header() {
         </Button>
 
         <ThemeToggle />
+        <LanguageToggle />
 
         <Button asChild variant="ghost" size="icon" aria-label="Избранное" className="relative">
           <Link href="/favorites">

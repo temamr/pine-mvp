@@ -45,7 +45,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const createOffer = usePineStore((state) => state.createOffer);
   const createComplaint = usePineStore((state) => state.createComplaint);
   const currentUserId = usePineStore((state) => state.currentUserId);
-  const { user } = useSupabaseSession();
+  const { user, profile } = useSupabaseSession();
   const [imageIndex, setImageIndex] = React.useState(0);
   const [offerAmount, setOfferAmount] = React.useState("");
   const [offerMessage, setOfferMessage] = React.useState("Готов забрать сегодня, если цена подойдет.");
@@ -129,6 +129,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
     ? remoteSeller
     : demoUsers.find((user) => user.id === currentListing.sellerId);
   const isOwnListing = supabaseEnabled ? viewerId === currentListing.sellerId : currentUserId === currentListing.sellerId;
+  const canEditListing = isOwnListing || profile?.role === "admin";
   const activeImage = currentListing.images[imageIndex] ?? currentListing.images[0];
   const lowball = Number(offerAmount) > 0 && Number(offerAmount) < currentListing.price.amount * 0.75;
   const similarListings = supabaseEnabled
@@ -338,7 +339,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                   <CardTitle className="text-2xl leading-tight">{listing.title}</CardTitle>
                   <p className="mt-2 text-sm text-muted-foreground">{formatRelativeDate(listing.createdAt)}</p>
                 </div>
-                {!isOwnListing ? (
+                {!canEditListing ? (
                   <Button variant="ghost" size="icon" onClick={() => handleFavorite(listing.id)} aria-label="В избранное">
                     <Heart className={listing.isFavorite ? "h-5 w-5 fill-red-500 text-red-500" : "h-5 w-5"} />
                   </Button>
@@ -347,7 +348,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
             </CardHeader>
             <CardContent className="grid gap-4">
               <p className="text-3xl font-bold">{formatMoney(listing.price)}</p>
-              {isOwnListing ? (
+              {canEditListing ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border bg-background p-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -363,7 +364,7 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                     </div>
                     <p className="mt-2 text-2xl font-bold">{favoriteCount}</p>
                   </div>
-                  {listing.status !== "sold" ? (
+                  {canEditListing && listing.status !== "sold" ? (
                     <Button asChild className="sm:col-span-2">
                       <Link href={`/sell?edit=${listing.id}`}>
                         <Pencil className="h-4 w-4" />
@@ -536,16 +537,18 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
         </div>
       </section>
 
-      <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 gap-2 border-t bg-white/95 p-3 backdrop-blur md:hidden">
-        <Button variant="outline" onClick={() => handleFavorite(listing.id)}>
-          <Heart className={listing.isFavorite ? "h-4 w-4 fill-red-500 text-red-500" : "h-4 w-4"} />
-          Сохранить
-        </Button>
-        <Button onClick={handleStartChat}>
-          <MessageCircle className="h-4 w-4" />
-          Написать
-        </Button>
-      </div>
+      {!canEditListing ? (
+        <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 gap-2 border-t bg-white/95 p-3 backdrop-blur md:hidden">
+          <Button variant="outline" onClick={() => handleFavorite(listing.id)}>
+            <Heart className={listing.isFavorite ? "h-4 w-4 fill-red-500 text-red-500" : "h-4 w-4"} />
+            Сохранить
+          </Button>
+          <Button onClick={handleStartChat}>
+            <MessageCircle className="h-4 w-4" />
+            Написать
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

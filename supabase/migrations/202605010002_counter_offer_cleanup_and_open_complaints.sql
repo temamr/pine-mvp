@@ -53,7 +53,7 @@ begin
     v_source.buyer_id,
     v_source.seller_id,
     p_amount,
-    'RUB',
+    'AED',
     'countered',
     p_message
   )
@@ -70,7 +70,7 @@ begin
     v_source.conversation_id,
     v_user_id,
     'system',
-    format('Продавец отправил контр-оффер на %s руб.', p_amount::integer),
+    format('Продавец отправил контр-оффер на %s AED.', p_amount::integer),
     'sent'
   );
 

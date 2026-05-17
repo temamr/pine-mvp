@@ -56,7 +56,7 @@ export function SellWizardScreen() {
     description: "",
     price: "",
     condition: "good",
-    locationLabel: "Москва",
+    locationLabel: "Dubai Marina",
     imageUrls: []
   });
 
@@ -487,7 +487,7 @@ export function SellWizardScreen() {
                   <Input
                     value={draft.locationLabel}
                     onChange={(event) => update("locationLabel", event.target.value)}
-                    placeholder="Москва, Пресненский район"
+                    placeholder="Dubai Marina, JBR, Business Bay"
                   />
                   {errors.locationLabel ? <span className="text-xs text-destructive">{errors.locationLabel}</span> : null}
                 </label>
@@ -498,7 +498,9 @@ export function SellWizardScreen() {
             {step === 5 ? (
               <div className="grid gap-4">
                 <h2 className="text-xl font-bold">{draft.title || "Название объявления"}</h2>
-                <p className="text-2xl font-bold">{Number(draft.price || 0).toLocaleString("ru-RU")} ₽</p>
+                <p className="text-2xl font-bold">
+                  {new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(Number(draft.price || 0))}
+                </p>
                 <p className="leading-7 text-muted-foreground">{draft.description || "Описание появится здесь."}</p>
                 <Badge className="w-fit" variant="warning">Проверьте карточку перед отправкой</Badge>
               </div>

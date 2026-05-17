@@ -310,7 +310,7 @@ export const usePineStore = create<StoreState>((set, get) => ({
       categoryId: payload.categoryId,
       title: payload.title,
       description: payload.description,
-      price: { amount: payload.price, currency: "RUB" },
+      price: { amount: payload.price, currency: "AED" },
       condition: payload.condition,
       status: payload.submitToModeration ? "pending" : "draft",
       images: imageUrls.map((url, index) => ({
@@ -325,8 +325,8 @@ export const usePineStore = create<StoreState>((set, get) => ({
       ],
       location: {
         city: payload.locationLabel,
-        region: "Россия",
-        country: "Россия",
+        region: "Dubai",
+        country: "United Arab Emirates",
         label: payload.locationLabel
       },
       viewsCount: 0,

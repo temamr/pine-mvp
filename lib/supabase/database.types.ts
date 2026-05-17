@@ -50,7 +50,7 @@ export type Database = {
           title: string;
           description: string;
           price_amount: number;
-          currency: "USD" | "EUR" | "RUB";
+          currency: "USD" | "EUR" | "RUB" | "AED";
           original_price_amount: number | null;
           condition: Database["public"]["Enums"]["listing_condition"];
           status: Database["public"]["Enums"]["listing_status"];
@@ -132,7 +132,7 @@ export type Database = {
           buyer_id: UUID;
           seller_id: UUID;
           amount: number;
-          currency: "USD" | "EUR" | "RUB";
+          currency: "USD" | "EUR" | "RUB" | "AED";
           status: Database["public"]["Enums"]["offer_status"];
           message: string | null;
           expires_at: Timestamp | null;
@@ -154,7 +154,7 @@ export type Database = {
           type: Database["public"]["Enums"]["deal_type"];
           status: Database["public"]["Enums"]["deal_status"];
           amount: number;
-          currency: "USD" | "EUR" | "RUB";
+          currency: "USD" | "EUR" | "RUB" | "AED";
           timeline: Json;
           created_at: Timestamp;
           updated_at: Timestamp;

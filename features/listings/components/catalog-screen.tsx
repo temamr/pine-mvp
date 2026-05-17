@@ -17,6 +17,7 @@ import { trackSupabaseAnalyticsEvent } from "@/features/analytics/lib/supabase-a
 import { ListingCard } from "@/features/listings/components/listing-card";
 import { ListingQuickPreview } from "@/features/listings/components/listing-quick-preview";
 import { fetchSupabaseCatalogData, toggleSupabaseFavorite } from "@/features/listings/lib/supabase-listings";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import { mockCategories } from "@/lib/mock/fixtures";
 import { usePineStore } from "@/lib/mock/use-pine-store";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -36,6 +37,7 @@ const conditions: ListingCondition[] = ["new", "like_new", "good", "fair", "for_
 export function CatalogScreen() {
   const router = useRouter();
   const { toast } = useToast();
+  const { language } = useLanguage();
   const supabaseEnabled = isSupabaseConfigured();
   const mockListings = usePineStore((state) => state.listings);
   const toggleFavorite = usePineStore((state) => state.toggleFavorite);
@@ -316,7 +318,9 @@ export function CatalogScreen() {
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{filteredListings.length} объявлений</p>
+          <p className="text-sm text-muted-foreground">
+            {language === "en" ? `${filteredListings.length} listings` : `${filteredListings.length} объявлений`}
+          </p>
           <Badge variant="outline" className="bg-white">
             {sortLabel[sort]}
           </Badge>

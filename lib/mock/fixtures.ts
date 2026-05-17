@@ -90,8 +90,8 @@ export const mockListings: Listing[] = [
     title: "Fujifilm X100V Silver kit",
     description:
       "Компактная камера в отличном состоянии. В комплекте ремень, батарея, зарядка и защитный фильтр. Использовалась бережно для travel-фото.",
-    price: { amount: 1180, currency: "USD" },
-    originalPrice: { amount: 1240, currency: "USD" },
+    price: { amount: 1180, currency: "AED" },
+    originalPrice: { amount: 1240, currency: "AED" },
     condition: "like_new",
     status: "published",
     images: [
@@ -131,7 +131,7 @@ export const mockListings: Listing[] = [
     title: "MacBook Air 13 M2 16/512 Midnight",
     description:
       "Легкий MacBook Air на M2 в конфигурации 16 GB RAM и 512 GB SSD. Батарея держит полный рабочий день, корпус без вмятин, клавиатура и экран в отличном состоянии.",
-    price: { amount: 980, currency: "USD" },
+    price: { amount: 980, currency: "AED" },
     condition: "good",
     status: "reserved",
     images: [
@@ -164,7 +164,7 @@ export const mockListings: Listing[] = [
     title: "NVIDIA GeForce RTX 4070 Super 12 GB",
     description:
       "Видеокарта в отличном состоянии, использовалась только для игр и 3D-рендера без майнинга. Температуры стабильные, коробка и чек на месте.",
-    price: { amount: 610, currency: "USD" },
+    price: { amount: 610, currency: "AED" },
     condition: "good",
     status: "published",
     images: [
@@ -197,8 +197,8 @@ export const mockListings: Listing[] = [
     title: "iPhone 15 Pro 256 GB Natural Titanium",
     description:
       "Разблокированный iPhone 15 Pro с 256 GB памяти. Экран без царапин, Face ID работает, батарея 96%. В комплекте USB-C кабель и MagSafe-чехол.",
-    price: { amount: 890, currency: "USD" },
-    originalPrice: { amount: 940, currency: "USD" },
+    price: { amount: 890, currency: "AED" },
+    originalPrice: { amount: 940, currency: "AED" },
     condition: "like_new",
     status: "published",
     images: [
@@ -231,7 +231,7 @@ export const mockListings: Listing[] = [
     title: "iPad Pro 11 M4 Wi-Fi 256 GB",
     description:
       "Тонкий iPad Pro 11 на M4, Wi-Fi версия. Использовался для заметок и дизайна, экран OLED без дефектов. В комплекте Apple Pencil Pro.",
-    price: { amount: 840, currency: "USD" },
+    price: { amount: 840, currency: "AED" },
     condition: "like_new",
     status: "published",
     images: [
@@ -264,7 +264,7 @@ export const mockListings: Listing[] = [
     title: "Sony WH-1000XM5 Black",
     description:
       "Беспроводные наушники с активным шумоподавлением. Амбушюры чистые, звук без хрипов, заряд держат отлично. Есть кейс и USB-C кабель.",
-    price: { amount: 250, currency: "USD" },
+    price: { amount: 250, currency: "AED" },
     condition: "good",
     status: "published",
     images: [
@@ -297,7 +297,7 @@ export const mockListings: Listing[] = [
     title: "LG UltraGear 27 QHD 144Hz",
     description:
       "Игровой 27-дюймовый QHD монитор с частотой 144Hz. Матрица без битых пикселей, подставка и DisplayPort кабель в комплекте.",
-    price: { amount: 230, currency: "USD" },
+    price: { amount: 230, currency: "AED" },
     condition: "good",
     status: "published",
     images: [
@@ -330,7 +330,7 @@ export const mockListings: Listing[] = [
     title: "PlayStation 5 Slim Disc Edition",
     description:
       "PS5 Slim с дисководом, двумя DualSense и вертикальной подставкой. Консоль тихая, не вскрывалась, аккаунты отвязаны.",
-    price: { amount: 420, currency: "USD" },
+    price: { amount: 420, currency: "AED" },
     condition: "like_new",
     status: "published",
     images: [
@@ -363,7 +363,7 @@ export const mockListings: Listing[] = [
     title: "Eero Pro 6E mesh router 2-pack",
     description:
       "Комплект из двух mesh-роутеров Eero Pro 6E. Стабильно покрывал квартиру 90 кв.м, сброшен до заводских настроек.",
-    price: { amount: 210, currency: "USD" },
+    price: { amount: 210, currency: "AED" },
     condition: "good",
     status: "published",
     images: [
@@ -396,7 +396,7 @@ export const mockListings: Listing[] = [
     title: "CalDigit USB-C dock with 4K HDMI",
     description:
       "Док-станция для ноутбука с HDMI 4K, Ethernet, USB-A, USB-C и SD card reader. Отлично подходит для MacBook и Windows ноутбуков.",
-    price: { amount: 120, currency: "USD" },
+    price: { amount: 120, currency: "AED" },
     condition: "good",
     status: "published",
     images: [
@@ -474,7 +474,7 @@ export const mockOffers: Offer[] = [
     listingId: "listing_fuji_x100v",
     buyerId: "user_buyer_eli",
     sellerId: "user_seller_mira",
-    amount: { amount: 1100, currency: "USD" },
+    amount: { amount: 1100, currency: "AED" },
     status: "sent",
     message: "Готов забрать сегодня.",
     expiresAt: "2026-04-13T08:00:00.000Z",
@@ -502,7 +502,7 @@ export const mockDeals: Deal[] = [
     sellerId: "user_seller_noah",
     type: "pine_check",
     status: "inspection",
-    amount: { amount: 940, currency: "USD" },
+    amount: { amount: 940, currency: "AED" },
     timeline: [
       {
         id: "deal_event_1",

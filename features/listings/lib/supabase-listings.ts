@@ -218,14 +218,14 @@ export async function createSupabaseListingFromDraft(input: SupabaseListingDraft
       title: input.title,
       description: input.description,
       price_amount: input.price,
-      currency: "RUB",
+      currency: "AED",
       condition: input.condition,
       status,
       attributes,
       location: {
         city: input.locationLabel,
-        region: "Россия",
-        country: "Россия",
+        region: "Dubai",
+        country: "United Arab Emirates",
         label: input.locationLabel
       }
     })
@@ -272,13 +272,27 @@ export async function fetchEditableSupabaseListing(listingId: ID): Promise<Edita
     throw new Error("Войдите, чтобы редактировать объявление.");
   }
 
-  const { data, error } = await client
+  const { data: profile, error: profileError } = await client
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  const canEditAnyListing = profile?.role === "admin";
+  let query = client
     .from("listings")
     .select("*, listing_images(*)")
-    .eq("id", listingId)
-    .eq("seller_id", user.id)
-    .returns<SupabaseListingRecord[]>()
-    .maybeSingle();
+    .eq("id", listingId);
+
+  if (!canEditAnyListing) {
+    query = query.eq("seller_id", user.id);
+  }
+
+  const { data, error } = await query.returns<SupabaseListingRecord[]>().maybeSingle();
 
   if (error) {
     throw error;
@@ -321,12 +335,33 @@ export async function updateSupabaseListingFromDraft(input: SupabaseListingDraft
     throw new Error("Войдите, чтобы редактировать объявление.");
   }
 
-  const { data: existingListing, error: existingListingError } = await client
+  const status = input.submitToModeration ? "pending" : "draft";
+  const attributes: Json = [
+    { label: "Источник", value: "Веб-публикация" },
+    { label: "Готовность", value: input.submitToModeration ? "На модерации" : "Черновик" }
+  ];
+
+  const { data: profile, error: profileError } = await client
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  const canEditAnyListing = profile?.role === "admin";
+  let existingQuery = client
     .from("listings")
     .select("status")
-    .eq("id", input.listingId)
-    .eq("seller_id", user.id)
-    .single();
+    .eq("id", input.listingId);
+
+  if (!canEditAnyListing) {
+    existingQuery = existingQuery.eq("seller_id", user.id);
+  }
+
+  const { data: existingListing, error: existingListingError } = await existingQuery.single();
 
   if (existingListingError) {
     throw existingListingError;
@@ -336,33 +371,32 @@ export async function updateSupabaseListingFromDraft(input: SupabaseListingDraft
     throw new Error("Проданное объявление нельзя редактировать.");
   }
 
-  const status = input.submitToModeration ? "pending" : "draft";
-  const attributes: Json = [
-    { label: "Источник", value: "Веб-публикация" },
-    { label: "Готовность", value: input.submitToModeration ? "На модерации" : "Черновик" }
-  ];
-
-  const { data: listingRow, error: listingError } = await client
+  let updateQuery = client
     .from("listings")
     .update({
       category_id: input.categoryId,
       title: input.title,
       description: input.description,
       price_amount: input.price,
-      currency: "RUB",
+      currency: "AED",
       condition: input.condition,
       status,
       moderation_note: null,
       attributes,
       location: {
         city: input.locationLabel,
-        region: "Россия",
-        country: "Россия",
+        region: "Dubai",
+        country: "United Arab Emirates",
         label: input.locationLabel
       }
     })
-    .eq("id", input.listingId)
-    .eq("seller_id", user.id)
+    .eq("id", input.listingId);
+
+  if (!canEditAnyListing) {
+    updateQuery = updateQuery.eq("seller_id", user.id);
+  }
+
+  const { data: listingRow, error: listingError } = await updateQuery
     .select("*, listing_images(*)")
     .returns<SupabaseListingRecord[]>()
     .single();

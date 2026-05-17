@@ -330,7 +330,7 @@ export async function createSupabaseOffer(conversation: Conversation, amount: nu
       buyer_id: conversation.buyerId,
       seller_id: conversation.sellerId,
       amount,
-      currency: "RUB",
+      currency: "AED",
       status: "sent",
       message
     })
@@ -341,7 +341,7 @@ export async function createSupabaseOffer(conversation: Conversation, amount: nu
     throw error;
   }
 
-  await insertSystemMessage(client, conversation.id, `Оффер на ${amount} руб. отправлен продавцу.`);
+  await insertSystemMessage(client, conversation.id, `Оффер на ${amount} AED отправлен продавцу.`);
 
   return mapOffer(data);
 }

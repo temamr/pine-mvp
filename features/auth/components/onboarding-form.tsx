@@ -24,9 +24,9 @@ export function OnboardingForm() {
   const [email, setEmail] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [bio, setBio] = React.useState("");
-  const [city, setCity] = React.useState("Москва");
-  const [region, setRegion] = React.useState("Москва");
-  const [country, setCountry] = React.useState("Россия");
+  const [city, setCity] = React.useState("Dubai");
+  const [region, setRegion] = React.useState("Dubai");
+  const [country, setCountry] = React.useState("United Arab Emirates");
   const [avatarUrl, setAvatarUrl] = React.useState("");
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = React.useState("");
@@ -64,9 +64,9 @@ export function OnboardingForm() {
           profile.location && typeof profile.location === "object" && !Array.isArray(profile.location)
             ? profile.location
             : {};
-        setCity(typeof location.city === "string" ? location.city : "Москва");
-        setRegion(typeof location.region === "string" ? location.region : "Москва");
-        setCountry(typeof location.country === "string" ? location.country : "Россия");
+        setCity(typeof location.city === "string" ? location.city : "Dubai");
+        setRegion(typeof location.region === "string" ? location.region : "Dubai");
+        setCountry(typeof location.country === "string" ? location.country : "United Arab Emirates");
       } else {
         setDisplayName(user.email?.split("@")[0] ?? "");
       }
