@@ -384,7 +384,9 @@ export function CatalogScreen() {
                 onClick={() => setPreview(listing)}
               >
                 <span className="font-semibold">{listing.title}</span>
-                <span className="text-sm text-muted-foreground">{listing.viewsCount} просмотров</span>
+                <span className="text-sm text-muted-foreground">
+                  {language === "en" ? `${listing.viewsCount} views` : `${listing.viewsCount} просмотров`}
+                </span>
               </button>
             ))}
           </CardContent>

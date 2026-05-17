@@ -29,6 +29,7 @@ import { ListingCard } from "@/features/listings/components/listing-card";
 import { fetchSupabaseListingDetails, toggleSupabaseFavorite } from "@/features/listings/lib/supabase-listings";
 import { createSupabaseComplaint } from "@/features/moderation/lib/supabase-moderation";
 import { useSupabaseSession } from "@/features/auth/components/use-supabase-session";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import { usePineStore, demoUsers } from "@/lib/mock/use-pine-store";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { STATUS_TONE } from "@/lib/theme";
@@ -38,6 +39,7 @@ import { conditionLabel, listingStatusLabel } from "@/lib/utils/labels";
 export function ListingDetailScreen({ listingId }: { listingId: string }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { language } = useLanguage();
   const supabaseEnabled = isSupabaseConfigured();
   const listings = usePineStore((state) => state.listings);
   const toggleFavorite = usePineStore((state) => state.toggleFavorite);
@@ -434,7 +436,11 @@ export function ListingDetailScreen({ listingId }: { listingId: string }) {
                     >
                       {seller?.displayName ?? "Продавец Pine"}
                     </Link>
-                  <p className="text-sm text-muted-foreground">{seller?.completedDealsCount ?? 0} завершенных сделок</p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "en"
+                        ? `${seller?.completedDealsCount ?? 0} completed deals`
+                        : `${seller?.completedDealsCount ?? 0} завершенных сделок`}
+                    </p>
                   </div>
                 </div>
                 <Badge variant="success">
